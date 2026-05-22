@@ -1,5 +1,5 @@
 import uuid
-from fastapi import Depends
+from fastapi import Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError, ExpiredSignatureError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,23 +8,29 @@ from app.settings import settings
 from app.connections.postgres import get_db
 from app.connections.redis import redis_client
 from app.api.auth.repository import UserRepository
-from app.api.exceptions.auth_exceptions import InvalidTokenException, TokenExpiredException
+from app.api.exceptions.auth_exceptions import (
+    InvalidTokenException, 
+    TokenExpiredException,
+    MissingTokenException,
+    MissingUserAgentException
+)
 from app.models.user_model import User
-
 
 security = HTTPBearer(auto_error=False)
 
-
 async def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: AsyncSession = Depends(get_db),
 ) -> User:
+    if not request.headers.get("user-agent"):
+        raise MissingUserAgentException()
+
     if not credentials:
-        raise InvalidTokenException()
+        raise MissingTokenException()
 
     token = credentials.credentials
 
-    # cek blacklist (logout)
     is_blacklisted = await redis_client.get(f"blacklist:{token}")
     if is_blacklisted:
         raise InvalidTokenException()

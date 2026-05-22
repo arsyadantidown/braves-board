@@ -5,7 +5,6 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.exceptions.base_exceptions import CustomException
 
-
 def custom_exception_handler(request: Request, exc: CustomException):
     return JSONResponse(
         status_code=exc.status_code,
@@ -20,21 +19,28 @@ def custom_exception_handler(request: Request, exc: CustomException):
         },
     )
 
-
 def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    status_code = exc.status_code
+    message = str(exc.detail)
+    code = "HTTP_EXCEPTION"
+
+    if status_code == status.HTTP_405_METHOD_NOT_ALLOWED:
+        status_code = status.HTTP_404_NOT_FOUND
+        message = "Endpoint tidak ditemukan"
+        code = "NOT_FOUND"
+
     return JSONResponse(
-        status_code=exc.status_code,
+        status_code=status_code,
         content={
             "success": False,
             "data": None,
             "error": {
-                "code": "HTTP_EXCEPTION",
-                "message": str(exc.detail),
+                "code": code,
+                "message": message,
                 "request_id": None,
             },
         },
     )
-
 
 def validation_exception_handler(request: Request, exc: RequestValidationError):
     message = "Format input tidak valid"
@@ -54,7 +60,6 @@ def validation_exception_handler(request: Request, exc: RequestValidationError):
             },
         },
     )
-
 
 def global_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
