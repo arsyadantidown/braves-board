@@ -1,8 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Optional, List, Any
-from pydantic import BaseModel, ConfigDict, model_validator
-
+from pydantic import BaseModel, ConfigDict, model_validator, field_validator
 
 class TaskBase(BaseModel):
     title: str
@@ -13,10 +12,8 @@ class TaskBase(BaseModel):
     is_timer_running: bool = False
     assignee_ids: Optional[List[uuid.UUID]] = None
 
-
 class TaskCreate(TaskBase):
     column_id: uuid.UUID
-
 
 class TaskResponse(TaskBase):
     id: uuid.UUID
@@ -29,7 +26,6 @@ class TaskResponse(TaskBase):
 
     model_config = ConfigDict(from_attributes=True)
 
-
 class TaskCreateRequest(BaseModel):
     column_id: uuid.UUID
     title: str
@@ -38,6 +34,46 @@ class TaskCreateRequest(BaseModel):
     labels: Optional[List[str]] = None
     assignee_ids: Optional[List[uuid.UUID]] = None
 
+    @field_validator('title')
+    @classmethod
+    def validate_title(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Judul task tidak boleh kosong")
+        return v.strip()
+
+    @field_validator('column_id', mode='before')
+    @classmethod
+    def validate_column_id(cls, v):
+        try:
+            return uuid.UUID(str(v))
+        except ValueError:
+            raise ValueError("Format column_id tidak valid")
+
+    @field_validator('assignee_ids', mode='before')
+    @classmethod
+    def validate_assignee_ids(cls, v):
+        if v is None:
+            return v
+        if not isinstance(v, list):
+            raise ValueError("Format assignee_ids harus berupa array/list")
+        for item in v:
+            try:
+                uuid.UUID(str(item))
+            except ValueError:
+                raise ValueError("Format UUID pada assignee_ids tidak valid")
+        return v
+
+    @field_validator('due_date', mode='before')
+    @classmethod
+    def validate_due_date(cls, v):
+        if v is None:
+            return v
+        if isinstance(v, str):
+            try:
+                datetime.fromisoformat(v.replace('Z', '+00:00'))
+            except ValueError:
+                raise ValueError("Format tanggal tidak valid")
+        return v
 
 class TaskListResponse(BaseModel):
     id: uuid.UUID
@@ -51,7 +87,6 @@ class TaskListResponse(BaseModel):
     is_timer_running: bool
     total_duration: Optional[int] = 0
 
-
 class SubtaskNestedResponse(BaseModel):
     id: uuid.UUID
     title: str
@@ -59,7 +94,6 @@ class SubtaskNestedResponse(BaseModel):
     position: int
     
     model_config = ConfigDict(from_attributes=True)
-
 
 class CommentNestedResponse(BaseModel):
     id: uuid.UUID
@@ -86,7 +120,6 @@ class AttachmentNestedResponse(BaseModel):
     
     model_config = ConfigDict(from_attributes=True)
 
-
 class TaskDetailResponse(TaskBase):
     id: uuid.UUID
     subtasks: List[SubtaskNestedResponse] = []
@@ -95,7 +128,6 @@ class TaskDetailResponse(TaskBase):
 
     model_config = ConfigDict(from_attributes=True)
 
-
 class TaskUpdateRequest(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
@@ -103,11 +135,59 @@ class TaskUpdateRequest(BaseModel):
     labels: Optional[List[str]] = None
     assignee_ids: Optional[List[uuid.UUID]] = None
 
+    @field_validator('title')
+    @classmethod
+    def validate_title(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            if not v or not v.strip():
+                raise ValueError("Judul task tidak boleh kosong")
+            return v.strip()
+        return v
+
+    @field_validator('assignee_ids', mode='before')
+    @classmethod
+    def validate_assignee_ids(cls, v):
+        if v is None:
+            return v
+        if not isinstance(v, list):
+            raise ValueError("Format assignee_ids harus berupa array/list")
+        for item in v:
+            try:
+                uuid.UUID(str(item))
+            except ValueError:
+                raise ValueError("Format UUID pada assignee_ids tidak valid")
+        return v
+
+    @field_validator('due_date', mode='before')
+    @classmethod
+    def validate_due_date(cls, v):
+        if v is None:
+            return v
+        if isinstance(v, str):
+            try:
+                datetime.fromisoformat(v.replace('Z', '+00:00'))
+            except ValueError:
+                raise ValueError("Format tanggal tidak valid")
+        return v
 
 class TaskMoveRequest(BaseModel):
     column_id: uuid.UUID
     position: int
 
+    @field_validator('column_id', mode='before')
+    @classmethod
+    def validate_column_id(cls, v):
+        try:
+            return uuid.UUID(str(v))
+        except ValueError:
+            raise ValueError("Format column_id tidak valid")
+
+    @field_validator('position')
+    @classmethod
+    def validate_position(cls, v: int) -> int:
+        if v < 1:
+            raise ValueError("Posisi task minimal adalah 1")
+        return v
 
 class TaskMoveResponse(BaseModel):
     id: uuid.UUID
@@ -116,10 +196,15 @@ class TaskMoveResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-
 class TaskReorderRequest(BaseModel):
     position: int
 
+    @field_validator('position')
+    @classmethod
+    def validate_position(cls, v: int) -> int:
+        if v < 1:
+            raise ValueError("Posisi task minimal adalah 1")
+        return v
 
 class TaskReorderResponse(BaseModel):
     id: uuid.UUID
