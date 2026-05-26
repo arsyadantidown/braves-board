@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 class TaskCommentBase(BaseModel):
     content: str
@@ -22,3 +22,10 @@ class TaskCommentResponse(TaskCommentBase):
 
 class AddCommentRequest(BaseModel):
     content: str
+
+    @field_validator('content')
+    @classmethod
+    def validate_content(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Isi komentar tidak boleh kosong")
+        return v.strip()
