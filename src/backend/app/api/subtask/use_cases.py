@@ -22,7 +22,6 @@ from app.api.exceptions.subtask_exceptions import (
     InvalidSubtaskStatusException,
 )
 
-
 class SubtaskUseCase:
     def __init__(self, db: AsyncSession):
         self.subtask_repo = SubtaskRepository(db)
@@ -81,8 +80,11 @@ class SubtaskUseCase:
         new_position = payload.position
         old_position = subtask.position
 
-        if new_position < 1 or new_position > max_position or new_position == old_position:
-            raise InvalidSubtaskPositionException()
+        if new_position > max_position:
+            new_position = max_position
+
+        if new_position == old_position:
+            return SubtaskMoveResponse.model_validate(subtask).model_dump()
 
         if new_position < old_position:
             await self.subtask_repo.shift_positions(
