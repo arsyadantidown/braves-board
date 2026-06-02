@@ -33,7 +33,10 @@ async def get_columns(
     use_case: ColumnUseCase = Depends(get_column_use_case),
     current_user: User = Depends(get_current_user),
 ):
-    result = await use_case.get_all_by_board_id(board_id)
+    result = await use_case.get_all_by_board_id(
+        board_id,
+        current_user.id,
+    )
     return success_response(result)
 
 
