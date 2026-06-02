@@ -21,7 +21,6 @@ class ColumnCreate(ColumnBase):
 
 class ColumnUpdate(BaseModel):
     title: Optional[str] = None
-    position: Optional[int] = None
 
     @field_validator("title")
     @classmethod
