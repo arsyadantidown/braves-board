@@ -113,11 +113,13 @@ class TaskUseCase:
         is_same_column = source_column_id == request.column_id
 
         if is_same_column:
-            if new_position < 1 or new_position > target_max or new_position == old_position:
-                raise InvalidTaskPositionException()
+            if new_position > target_max:
+                new_position = target_max
+            if new_position == old_position:
+                return TaskMoveResponse.model_validate(task)
         else:
-            if new_position < 1 or new_position > target_max + 1:
-                raise InvalidTaskPositionException()
+            if new_position > target_max + 1:
+                new_position = target_max + 1
 
         if is_same_column:
             if new_position < old_position:
@@ -168,8 +170,11 @@ class TaskUseCase:
         new_position = request.position
         old_position = task.position
 
-        if new_position < 1 or new_position > max_position or new_position == old_position:
-            raise InvalidTaskPositionException()
+        if new_position > max_position:
+            new_position = max_position
+
+        if new_position == old_position:
+            return TaskReorderResponse.model_validate(task)
 
         if new_position < old_position:
             await self.task_repo.shift_positions(
