@@ -1,9 +1,8 @@
-#!/bin/sh
 set -e
 
 echo "Running database migrations..."
 
-cd /usr/src/app/src/backend
+cd /app
 
 alembic upgrade head
 

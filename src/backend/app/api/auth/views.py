@@ -1,5 +1,6 @@
+import secrets
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, Response, Cookie, Query
+from fastapi import APIRouter, Depends, Response, Cookie, Query, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from jose import jwt
@@ -28,38 +29,82 @@ from app.api.standard_response import StandardResponse, success_response
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
 @router.get("/google/login", response_model=StandardResponse[AuthUrlData])
-async def google_login(state: str | None = Query(default=None)):
-    auth_url = AuthUseCase.get_google_auth_url(state)
+async def google_login(response: Response):
+    state = secrets.token_urlsafe(32)
+    nonce = secrets.token_urlsafe(32)
+    
+    auth_url = AuthUseCase.get_google_auth_url(state=state, nonce=nonce)
+    
+    response.set_cookie(
+        key="oauth_state",
+        value=state,
+        httponly=True,
+        secure=settings.APP_ENV == "production",
+        samesite="lax",
+        max_age=600,
+    )
+
+    response.set_cookie(
+        key="oauth_nonce",
+        value=nonce,
+        httponly=True,
+        secure=settings.APP_ENV == "production",
+        samesite="lax",
+        max_age=600,
+    )
+    
     return success_response(AuthUrlData(auth_url=auth_url))
 
 @router.get("/google/callback")
 async def google_callback(
     code: str | None = Query(default=None),
     state: str | None = Query(default=None),
+    oauth_state: str | None = Cookie(default=None),
+    oauth_nonce: str | None = Cookie(default=None),
     db: AsyncSession = Depends(get_db),
 ):
     if not code or not code.strip():
         return RedirectResponse(
             url=f"{settings.FRONTEND_URL}/?error=invalid_request"
         )
+        
+    if not state or not oauth_state or state != oauth_state:
+        return RedirectResponse(
+            url=f"{settings.FRONTEND_URL}/?error=csrf_validation_failed"
+        )
+        
+    if not oauth_nonce:
+        return RedirectResponse(
+            url=f"{settings.FRONTEND_URL}/?error=nonce_validation_failed"
+        )
 
     user_repo = UserRepository(db)
 
     try:
-        result = await AuthUseCase.handle_google_callback(code, user_repo)
+        result = await AuthUseCase.handle_google_callback(code, oauth_nonce, user_repo)
 
-        redirect_url = f"{settings.FRONTEND_URL}/dashboard?access_token={result['access_token']}"
-        if state:
-            redirect_url += f"&state={state}"
-
+        redirect_url = f"{settings.FRONTEND_URL}/dashboard"
         redirect_response = RedirectResponse(url=redirect_url)
+
+        redirect_response.delete_cookie("oauth_state", path="/")
+        redirect_response.delete_cookie("oauth_nonce", path="/")
+
+        redirect_response.set_cookie(
+            key="access_token",
+            value=result["access_token"],
+            httponly=False,
+            secure=settings.APP_ENV == "production",
+            samesite="lax",
+            path="/",
+            max_age=30,
+        )
 
         redirect_response.set_cookie(
             key="refresh_token",
             value=result["refresh_token"],
             httponly=True,
-            secure=False,
-            samesite="lax",
+            secure=settings.APP_ENV == "production",
+            samesite="strict",
             path="/",
             max_age=604800,
         )
@@ -114,6 +159,9 @@ async def logout(
     )
 
     exp_timestamp = payload.get("exp")
+    if exp_timestamp is None:
+        raise HTTPException(status_code=400, detail="Invalid token payload")
+
     now_timestamp = int(datetime.now(timezone.utc).timestamp())
     ttl = exp_timestamp - now_timestamp 
 
@@ -123,9 +171,9 @@ async def logout(
     response.delete_cookie(
         key="refresh_token",
         path="/",
-        secure=False,
+        secure=settings.APP_ENV == "production",
         httponly=True,
-        samesite="lax",
+        samesite="strict",
     )
 
     return success_response(LogoutData(message=LogoutSuccessMessage.MESSAGE))

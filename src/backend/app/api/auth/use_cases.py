@@ -16,7 +16,7 @@ from app.api.exceptions.auth_exceptions import (
 
 class AuthUseCase:
     @staticmethod
-    def get_google_auth_url(state: str | None = None) -> str:
+    def get_google_auth_url(state: str | None = None, nonce: str | None = None) -> str:
         try:
             base_url = "https://accounts.google.com/o/oauth2/v2/auth"
             params = {
@@ -29,12 +29,14 @@ class AuthUseCase:
             }
             if state:
                 params["state"] = state
+            if nonce:
+                params["nonce"] = nonce
             return f"{base_url}?{urllib.parse.urlencode(params)}"
         except Exception:
             raise GoogleAuthException()
 
     @staticmethod
-    async def handle_google_callback(code: str, user_repo: UserRepository):
+    async def handle_google_callback(code: str, expected_nonce: str, user_repo: UserRepository):
         decoded_code = urllib.parse.unquote(code)
 
         async with httpx.AsyncClient() as client:
@@ -53,6 +55,17 @@ class AuthUseCase:
 
             google_tokens = res.json()
             access_token = google_tokens.get("access_token")
+            id_token = google_tokens.get("id_token")
+
+            if not id_token:
+                raise InvalidGoogleCodeException()
+
+            try:
+                id_token_payload = jwt.get_unverified_claims(id_token)
+                if id_token_payload.get("nonce") != expected_nonce:
+                    raise InvalidGoogleCodeException()
+            except JWTError:
+                raise InvalidGoogleCodeException()
 
             user_info_res = await client.get(
                 "https://www.googleapis.com/oauth2/v3/userinfo",

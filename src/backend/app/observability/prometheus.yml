@@ -8,6 +8,7 @@ scrape_configs:
       - targets: ["localhost:9090"]
 
   - job_name: "braves-board-api"
+    bearer_token: "f11fcdf9b9fa4a3fd79c518d98cc7c037b6f432ff00815fdcefad42f6ca92086"
     static_configs:
       - targets: ["api:8000"]
     metrics_path: "/metrics"

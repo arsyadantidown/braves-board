@@ -8,7 +8,7 @@ from app.connections.redis import redis_client
 router = APIRouter(tags=["Health Check"])
 
 @router.get(
-    "/healthz",
+    "/health",
     response_model=HealthData,
     status_code=status.HTTP_200_OK,
 )
@@ -19,7 +19,7 @@ async def liveness_check():
     )
 
 @router.get(
-    "/readyz",
+    "/ready",
     response_model=ReadinessData,
 )
 async def readiness_check(response: Response):

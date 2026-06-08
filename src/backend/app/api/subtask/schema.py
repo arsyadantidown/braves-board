@@ -9,8 +9,9 @@ class SubtaskBase(BaseModel):
     position: int
 
 class SubtaskCreateRequest(BaseModel):
+    task_id: uuid.UUID
     title: str
-
+    
     @field_validator('title')
     @classmethod
     def validate_title(cls, v: str) -> str:
