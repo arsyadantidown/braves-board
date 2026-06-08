@@ -45,51 +45,24 @@ Kloning repositori ini ke mesin lokal Anda:
 git clone <url-repositori-anda>
 cd braves-board-backend
 
-Buat file baru bernama `development.env` di dalam folder `src/backend/app/config/env/` dan salin variabel berikut ke dalamnya:
+Buat file *environment variables* (`.env`) di dalam folder `src/backend/app/config/env/`. Karena aplikasi ini mendukung berbagai jenis environment, **terdapat 4 file konfigurasi** yang perlu disiapkan, yaitu:
 
-```env
-# ==========================================
-# APP CONFIGURATION
-# ==========================================
-PORT=8000
+1. `development.env` (untuk *development* lokal)
+2. `test.env` (untuk *automated testing*)
+3. `staging.env` (untuk *server staging*)
+4. `production.env` (untuk *server production*)
 
-# ==========================================
-# DATABASE CONFIGURATION
-# ==========================================
-DATABASE_URL=sqlite+aiosqlite:///:memory:
+Anda dapat menyalin *template* awal dari file `env.example` yang sudah disediakan:
 
-# ==========================================
-# IN-MEMORY DATABASE
-# ==========================================
-REDIS_URL=redis://localhost:6379/15
-
-# ==========================================
-# JWT & SECURITY
-# ==========================================
-JWT_SECRET=test_secret
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=1
-INTERNAL_CRON_SECRET=test_secret
-
-# ==========================================
-# GOOGLE OAUTH 2.0 (mock)
-# ==========================================
-GOOGLE_CLIENT_ID=test
-GOOGLE_CLIENT_SECRET=test
-GOOGLE_REDIRECT_URI=http://test.local/callback
-
-# ==========================================
-# FRONTEND / CORS
-# ==========================================
-<!-- FRONTEND_URL=http://localhost:3000 -->
-FRONTEND_URL=http://localhost:5173
-
-# ==========================================
-# STORAGE MOCK
-# ==========================================
-GCS_BUCKET_NAME=test-bucket
-GOOGLE_APPLICATION_CREDENTIALS=path/to/credential.json
+```bash
+cd src/backend/app/config/env/
+cp env.example development.env
+cp env.example test.env
+cp env.example staging.env
+cp env.example production.env
 ```
+
+Pastikan Anda mengubah isi variabel di dalam file-file tersebut (seperti `POSTGRES_USER`, `JWT_SECRET`, dll) sesuai dengan *environment* yang dituju. Docker Compose akan secara otomatis mendeteksi dan menggunakan file konfigurasi yang tepat sesuai dengan file `.yml` yang dijalankan.
 ---
 
 ### 2. Jalankan Kontainer Docker
