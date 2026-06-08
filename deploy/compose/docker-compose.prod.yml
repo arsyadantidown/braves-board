@@ -1,44 +1,109 @@
+networks:
+  frontend_net:
+    driver: bridge
+  backend_net:
+    driver: bridge
+  db_net:
+    driver: bridge
+
 services:
+  nginx:
+    build:
+      context: ../../
+      dockerfile: deploy/docker/nginx.Dockerfile
+    container_name: braves_board_nginx_prod
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../../deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../../deploy/nginx/conf.d:/etc/nginx/conf.d:ro
+    networks:
+      - frontend_net
+      - backend_net
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
   api:
     build:
       context: ../../
-      dockerfile: deploy/docker/Dockerfile.prod
+      dockerfile: deploy/docker/backend.prod.Dockerfile
     container_name: braves_board_backend_prod
-    ports:
-      - "8000:8000"
+    command: ["sh", "/entrypoints/api.sh"]
     env_file:
       - ../../src/backend/app/config/env/production.env
+    networks:
+      - backend_net
+      - db_net
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: always
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
 
   migrator:
     build:
       context: ../../
-      dockerfile: deploy/docker/Dockerfile.prod
+      dockerfile: deploy/docker/backend.prod.Dockerfile
     container_name: braves_board_migrator_prod
-    command: ["sh", "/app/deploy/docker/entrypoints/migrator.sh"]
+    command: ["sh", "/entrypoints/migrator.sh"]
     env_file:
       - ../../src/backend/app/config/env/production.env
+    networks:
+      - db_net
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   db:
     image: postgres:15
     container_name: braves_board_db_prod
     env_file:
       - ../../src/backend/app/config/env/production.env
+
     volumes:
       - postgres_data_prod:/var/lib/postgresql/data
+    networks:
+      - db_net
     restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
-    image: redis:7
-    container_name: braves_board_redis_prod
-    volumes:
-      - redis_data_prod:/data
-    restart: always
+      image: redis:7
+      container_name: braves_board_redis_prod
+      command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly yes"]
+      volumes:
+        - redis_data_prod:/data
+      networks:
+        - db_net
+      restart: always
+      healthcheck:
+        test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping"]
+        interval: 10s
+        timeout: 5s
+        retries: 5
 
 volumes:
   postgres_data_prod:
