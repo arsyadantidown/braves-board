@@ -1,8 +1,6 @@
-# =============================================================================
 # backend.staging.Dockerfile
 # Identik dengan prod — staging harus semirip mungkin dengan production
 # untuk memastikan environment parity.
-# =============================================================================
 
 # --- Stage 1: Builder ---
 FROM python:3.11-slim AS builder

@@ -18,15 +18,12 @@ CSRF_PROTECTED_METHODS = {"POST", "PUT", "DELETE", "PATCH"}
 
 class CSRFMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        # 1. Skip jika endpoint sudah memiliki proteksi CSRF sendiri
         if request.url.path in CSRF_EXEMPT_PATHS:
             return await call_next(request)
 
-        # 2. Hanya proteksi method yang mengubah state
         if request.method not in CSRF_PROTECTED_METHODS:
             return await call_next(request)
 
-        # 3. Bangun daftar allowed origins
         allowed_origins = [settings.FRONTEND_URL]
         if settings.APP_ENV == "development":
             allowed_origins.extend([
@@ -37,7 +34,6 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         origin = request.headers.get("origin")
         referer = request.headers.get("referer")
 
-        # 4. Validasi Origin atau Referer
         if origin:
             if origin not in allowed_origins:
                 raise HTTPException(

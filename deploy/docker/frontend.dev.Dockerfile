@@ -1,9 +1,7 @@
-# =============================================================================
 # frontend.dev.Dockerfile
 # Environment development:
 #   - Hot-reload Vite aktif
 #   - Berjalan sebagai non-root user
-# =============================================================================
 
 FROM node:20-alpine
 

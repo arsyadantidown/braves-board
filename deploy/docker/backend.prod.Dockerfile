@@ -1,9 +1,8 @@
-# =============================================================================
+
 # backend.prod.Dockerfile
 # Multi-stage build:
 #   - Stage "builder": install build tools + compile dependencies
 #   - Stage "runtime": image bersih tanpa compiler, jalankan sebagai non-root
-# =============================================================================
 
 # --- Stage 1: Builder ---
 FROM python:3.11-slim AS builder

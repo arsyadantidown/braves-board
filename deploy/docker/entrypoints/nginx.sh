@@ -1,11 +1,8 @@
-#!/bin/sh
 set -e
 
-# =============================================================================
 # Nginx Entrypoint
 # - Generate self-signed SSL cert for development
 # - Start Nginx
-# =============================================================================
 
 CERT_DIR="/etc/nginx/ssl"
 CERT_FILE="${CERT_DIR}/server.crt"
