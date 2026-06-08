@@ -38,9 +38,11 @@ class TaskAttachmentUseCase:
 
         file_type, max_size = file_info
 
-        file.file.seek(0, 2)
-        file_size = file.file.tell()
-        file.file.seek(0)
+        file_size = getattr(file, 'size', None)
+        if file_size is None:
+            file.file.seek(0, 2)
+            file_size = file.file.tell()
+            file.file.seek(0)
 
         if file_size > max_size:
             if file_type == "image":
@@ -50,7 +52,8 @@ class TaskAttachmentUseCase:
             elif file_type == "video":
                 raise VideoTooLargeException()
 
-        file_extension = file.filename.split(".")[-1]
+        safe_filename = file.filename or "unknown_file"
+        file_extension = safe_filename.split(".")[-1] if "." in safe_filename else "bin"
         destination_path = f"tasks/{task_id}/{uuid.uuid4()}.{file_extension}"
         
         file_url = self.storage_util.upload_file(file, destination_path)
@@ -58,7 +61,7 @@ class TaskAttachmentUseCase:
         attachment_in = TaskAttachmentCreate(
             task_id=task_id,
             type=file_type,
-            file_name=file.filename,
+            file_name=safe_filename,
             file_url=file_url
         )
 
