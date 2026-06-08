@@ -3,7 +3,6 @@ from fastapi import APIRouter, Depends, Response, Cookie, Query
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from jose import jwt
-from fastapi import Query
 from fastapi.responses import RedirectResponse
 
 from app.settings import settings
@@ -11,9 +10,7 @@ from app.connections.postgres import get_db
 from app.connections.redis import redis_client
 from app.api.auth.repository import UserRepository
 from app.api.auth.schema import (
-    AuthCallbackRequest,
     AuthUrlData,
-    TokenData,
     CurrentUserData,
     LogoutData,
     AccessTokenData
@@ -21,32 +18,41 @@ from app.api.auth.schema import (
 from app.api.auth.use_cases import AuthUseCase
 from app.api.depedencies import get_current_user, security
 from app.models.user_model import User
-from app.api.exceptions.auth_exceptions import InvalidRefreshTokenException, LogoutSuccessMessage
+from app.api.exceptions.auth_exceptions import (
+    InvalidRefreshTokenException, 
+    MissingRefreshTokenException,
+    LogoutSuccessMessage
+)
 from app.api.standard_response import StandardResponse, success_response
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
 @router.get("/google/login", response_model=StandardResponse[AuthUrlData])
-async def google_login():
-    auth_url = AuthUseCase.get_google_auth_url()
+async def google_login(state: str | None = Query(default=None)):
+    auth_url = AuthUseCase.get_google_auth_url(state)
     return success_response(AuthUrlData(auth_url=auth_url))
-
-from fastapi import Query
-from fastapi.responses import RedirectResponse
 
 @router.get("/google/callback")
 async def google_callback(
-    code: str = Query(...),
+    code: str | None = Query(default=None),
+    state: str | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
 ):
+    if not code or not code.strip():
+        return RedirectResponse(
+            url=f"{settings.FRONTEND_URL}/?error=invalid_request"
+        )
+
     user_repo = UserRepository(db)
 
     try:
         result = await AuthUseCase.handle_google_callback(code, user_repo)
 
-        redirect_response = RedirectResponse(
-            url=f"{settings.FRONTEND_URL}/dashboard?access_token={result['access_token']}"
-        )
+        redirect_url = f"{settings.FRONTEND_URL}/dashboard?access_token={result['access_token']}"
+        if state:
+            redirect_url += f"&state={state}"
+
+        redirect_response = RedirectResponse(url=redirect_url)
 
         redirect_response.set_cookie(
             key="refresh_token",
@@ -81,7 +87,7 @@ async def refresh_token(
     db: AsyncSession = Depends(get_db),
 ):
     if not refresh_token:
-        raise InvalidRefreshTokenException()
+        raise MissingRefreshTokenException()
 
     user_repo = UserRepository(db)
     result = await AuthUseCase.refresh_access_token(refresh_token, user_repo)

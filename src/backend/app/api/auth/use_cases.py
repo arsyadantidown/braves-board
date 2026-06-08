@@ -16,7 +16,7 @@ from app.api.exceptions.auth_exceptions import (
 
 class AuthUseCase:
     @staticmethod
-    def get_google_auth_url() -> str:
+    def get_google_auth_url(state: str | None = None) -> str:
         try:
             base_url = "https://accounts.google.com/o/oauth2/v2/auth"
             params = {
@@ -27,6 +27,8 @@ class AuthUseCase:
                 "access_type": "offline",
                 "prompt": "consent",
             }
+            if state:
+                params["state"] = state
             return f"{base_url}?{urllib.parse.urlencode(params)}"
         except Exception:
             raise GoogleAuthException()
