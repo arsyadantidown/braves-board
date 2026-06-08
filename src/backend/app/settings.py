@@ -7,9 +7,6 @@ class Settings(BaseSettings):
     APP_ENV: str
     PORT: int = 8000
 
-    DB_USER: str
-    DB_PASSWORD: str
-    DB_NAME: str
     DATABASE_URL: str
 
     REDIS_URL: str
