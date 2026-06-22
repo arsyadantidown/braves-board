@@ -16,7 +16,8 @@ async def test_google_callback_success(client):
         
         response = await client.get(
             "/api/v1/auth/google/callback",
-            params={"code": "valid_code", "state": "valid_state"}
+            params={"code": "valid_code", "state": "valid_state"},
+            follow_redirects=False
         )
         
     assert response.status_code in [302, 303, 307]
@@ -30,7 +31,7 @@ async def test_google_callback_success(client):
 
 @pytest.mark.anyio
 async def test_google_callback_missing_code(client):
-    response = await client.get("/api/v1/auth/google/callback")
+    response = await client.get("/api/v1/auth/google/callback", follow_redirects=False)
     assert response.status_code in [302, 303, 307]
     assert "error=invalid_request" in response.headers["location"]
 
@@ -39,7 +40,8 @@ async def test_google_callback_invalid_state(client):
     client.cookies.set("oauth_state", "some_state")
     response = await client.get(
         "/api/v1/auth/google/callback", 
-        params={"code": "valid_code", "state": "different_state"}
+        params={"code": "valid_code", "state": "different_state"},
+        follow_redirects=False
     )
     assert response.status_code in [302, 303, 307]
     assert "error=csrf_validation_failed" in response.headers["location"]
@@ -49,7 +51,8 @@ async def test_google_callback_missing_nonce(client):
     client.cookies.set("oauth_state", "valid_state")
     response = await client.get(
         "/api/v1/auth/google/callback",
-        params={"code": "valid_code", "state": "valid_state"}
+        params={"code": "valid_code", "state": "valid_state"},
+        follow_redirects=False
     )
     assert response.status_code in [302, 303, 307]
     assert "error=nonce_validation_failed" in response.headers["location"]
@@ -64,7 +67,8 @@ async def test_google_callback_use_case_exception(client):
         
         response = await client.get(
             "/api/v1/auth/google/callback",
-            params={"code": "valid_code", "state": "valid_state"}
+            params={"code": "valid_code", "state": "valid_state"},
+            follow_redirects=False
         )
         
     assert response.status_code in [302, 303, 307]
