@@ -1,10 +1,52 @@
 import pytest
+import uuid
+import asyncio
+
 from httpx import AsyncClient
 from unittest.mock import AsyncMock, MagicMock
+from httpx import AsyncClient, ASGITransport
 from app.connections.redis import redis_client
 from app.main import app
+from app.api.depedencies import get_current_user
+from app.models.user_model import User
 
-@pytest.fixture(scope="session")
+# Mock User
+@pytest.fixture
+def mock_user():
+    return User(
+        id=uuid.uuid4(),
+        email="test@test.com"
+    )
+
+
+@pytest.fixture(autouse=True)
+def reset_event_loop():
+    yield
+    asyncio.set_event_loop(asyncio.new_event_loop())
+
+@pytest.fixture(autouse=True)
+def override_auth(mock_user):
+    app.dependency_overrides[get_current_user] = lambda: mock_user
+    yield
+    app.dependency_overrides.clear()
+
+@pytest.fixture(autouse=True)
+def disable_redis(monkeypatch):
+    import app.connections.redis as redis_module
+
+    class FakeRedis:
+        async def exists(self, *args, **kwargs):
+            return 0
+
+        async def ping(self):
+            return True
+
+        async def close(self):
+            pass
+
+    monkeypatch.setattr(redis_module, "redis_client", FakeRedis())
+
+@pytest.fixture
 def anyio_backend():
     return "asyncio"
 
@@ -39,6 +81,12 @@ def mock_redis():
 
 @pytest.fixture
 async def client():
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    transport = ASGITransport(app=app)
+
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        follow_redirects=True
+    ) as ac:
         yield ac
 

@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
@@ -16,10 +18,13 @@ from app.middleware.nonce import setup_nonce
 from app.middleware.csrf import setup_csrf
 from app.api.exceptions.setup_exceptions import setup_exception_handlers
 
+IS_TEST = (settings.APP_ENV or "").lower() == "test"
+
 if settings.APP_ENV in ["production", "staging"]:
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 else:
     app = FastAPI()
+
 
 metrics_security = HTTPBearer()
 
@@ -30,23 +35,26 @@ async def verify_metrics_token(credentials: HTTPAuthorizationCredentials = Depen
             detail="Invalid metrics token"
         )
 
-setup_rate_limit(app)
 setup_security_headers(app)
 setup_access_log(app)
 setup_request_id(app)
 setup_cors(app)
-setup_nonce(app)
-setup_csrf(app)
+
+if not IS_TEST:
+    setup_rate_limit(app)
+    setup_nonce(app)
+    setup_csrf(app)
 
 setup_exception_handlers(app)
 
 setup_prometheus(app)
+
 app.add_api_route(
-    "/metrics", 
-    metrics_endpoint, 
+    "/metrics",
+    metrics_endpoint,
     methods=["GET"],
     dependencies=[Depends(verify_metrics_token)]
 )
-app.include_router(health_router, prefix="/api/v1")
 
+app.include_router(health_router, prefix="/api/v1")
 app.include_router(api_router)

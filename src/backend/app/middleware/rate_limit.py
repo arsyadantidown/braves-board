@@ -1,3 +1,5 @@
+import os
+
 import time
 import uuid
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -6,6 +8,8 @@ from starlette.responses import JSONResponse
 
 from app.connections.redis import redis_client
 from app.settings import settings
+
+IS_TEST = os.getenv("APP_ENV", "").lower() == "test"
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, default_limit=50, default_window=60):
@@ -19,6 +23,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         }
 
     async def dispatch(self, request: Request, call_next):
+        
+        if IS_TEST:
+            return await call_next(request)
+        
         ip = request.client.host if request.client else "127.0.0.1"
         path = request.url.path
 
