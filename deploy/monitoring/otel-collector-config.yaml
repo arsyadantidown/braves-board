@@ -1,0 +1,32 @@
+receivers:
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'braves_board_api'
+          scrape_interval: 15s
+          metrics_path: '/metrics'
+          # Mengambil METRICS_SECRET dari environment variable Compose
+          authorization:
+            credentials: "${env:METRICS_SECRET}"
+          static_configs:
+            - targets: ['api:8000']
+
+processors:
+  batch:
+    send_batch_size: 1000
+    timeout: 10s
+
+exporters:
+  googlecloud:
+    # Google Cloud Exporter akan otomatis membaca kredensial dari 
+    # GOOGLE_APPLICATION_CREDENTIALS yang kita pasang di docker-compose
+    project: "${env:GCP_PROJECT_ID}"
+    metric:
+      prefix: "custom.googleapis.com/"
+
+service:
+  pipelines:
+    metrics:
+      receivers: [prometheus]
+      processors: [batch]
+      exporters: [googlecloud]

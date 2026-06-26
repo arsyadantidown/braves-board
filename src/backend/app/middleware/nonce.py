@@ -26,17 +26,35 @@ class NonceMiddleware(BaseHTTPMiddleware):
 
         nonce = request.headers.get("X-Request-Nonce")
         if not nonce:
-            raise HTTPException(
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="X-Request-Nonce header is required for non-idempotent requests",
+                content={
+                    "success": False,
+                    "data": None,
+                    "error": {
+                        "code": "BAD_REQUEST",
+                        "message": "X-Request-Nonce header is required for non-idempotent requests",
+                        "request_id": getattr(request.state, "request_id", None)
+                    }
+                }
             )
 
         key = f"nonce:{nonce}"
         exists = await redis_client.exists(key)
         if exists:
-            raise HTTPException(
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Replay attack detected: duplicate nonce",
+                content={
+                    "success": False,
+                    "data": None,
+                    "error": {
+                        "code": "CONFLICT",
+                        "message": "Replay attack detected: duplicate nonce",
+                        "request_id": getattr(request.state, "request_id", None)
+                    }
+                }
             )
 
         async with redis_client.pipeline(transaction=True) as pipe:

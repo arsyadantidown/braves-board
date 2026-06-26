@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     GCS_BUCKET_NAME: str
     GOOGLE_APPLICATION_CREDENTIALS: str
 
+    # TimescaleDB Logging Config
+    LOG_RETENTION_DAYS: int = 30
+    LOG_COMPRESSION_DAYS: int = 7
+    LOG_FLUSH_INTERVAL_SECONDS: int = 5
+    LOG_BUFFER_SIZE: int = 100
+
     model_config = SettingsConfigDict(
         env_file_encoding="utf-8",
         extra="ignore",

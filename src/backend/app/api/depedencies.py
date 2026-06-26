@@ -61,4 +61,5 @@ async def get_current_user(
     if user is None:
         raise InvalidTokenException()
 
+    request.state.user_id = str(user.id)
     return user

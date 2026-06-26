@@ -74,8 +74,9 @@ services:
         condition: service_healthy
 
   db:
-    image: postgres:15
+    image: timescale/timescaledb:latest-pg15
     container_name: braves_board_db_prod
+    command: ["postgres", "-c", "shared_preload_libraries=timescaledb"]
     env_file:
       - ../../src/backend/app/config/env/production.env
 
@@ -104,6 +105,26 @@ services:
         interval: 10s
         timeout: 5s
         retries: 5
+
+  # Agen Pengirim Metrik (Google Cloud Monitoring)
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: braves_board_otel_prod
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ../../deploy/monitoring/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+      # Rahasia Service Account dari GCP untuk otentikasi
+      - ../../src/backend/app/config/credentials/gcp-service-account.json:/etc/gcp/service-account.json:ro
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/service-account.json
+      - METRICS_SECRET=${METRICS_SECRET}
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+    networks:
+      - backend_net
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: always
 
 volumes:
   postgres_data_prod:

@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -16,14 +17,30 @@ from app.middleware.rate_limit import setup_rate_limit
 from app.middleware.security_headers import setup_security_headers
 from app.middleware.nonce import setup_nonce
 from app.middleware.csrf import setup_csrf
+from app.middleware.db_logging import setup_db_logging
 from app.api.exceptions.setup_exceptions import setup_exception_handlers
+from app.lib.logging.timescale_handler import setup_log_handler, shutdown_log_handler
 
 IS_TEST = (settings.APP_ENV or "").lower() == "test"
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: initialize TimescaleDB log handler
+    if not IS_TEST:
+        await setup_log_handler()
+
+    yield
+
+    # Shutdown: flush and close log handler
+    if not IS_TEST:
+        await shutdown_log_handler()
+
+
 if settings.APP_ENV in ["production", "staging"]:
-    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
 else:
-    app = FastAPI()
+    app = FastAPI(lifespan=lifespan)
 
 
 metrics_security = HTTPBearer()
@@ -36,14 +53,16 @@ async def verify_metrics_token(credentials: HTTPAuthorizationCredentials = Depen
         )
 
 setup_security_headers(app)
-setup_access_log(app)
-setup_request_id(app)
-setup_cors(app)
 
 if not IS_TEST:
-    setup_rate_limit(app)
     setup_nonce(app)
     setup_csrf(app)
+    setup_rate_limit(app)
+
+setup_access_log(app)
+setup_db_logging(app)
+setup_request_id(app)
+setup_cors(app)
 
 setup_exception_handlers(app)
 

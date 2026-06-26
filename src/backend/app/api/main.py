@@ -9,6 +9,7 @@ from app.api.task_comment.views import router as task_comment_router
 from app.api.task_attachment.views import router as task_attachment_router
 from app.api.user.views import router as user_router
 from app.api.time_tracking.views import router as time_tracking_router
+from app.api.log.views import router as log_router
 
 api_router = APIRouter()
 
@@ -21,3 +22,4 @@ api_router.include_router(task_comment_router)
 api_router.include_router(task_attachment_router)
 api_router.include_router(user_router)
 api_router.include_router(time_tracking_router)
+api_router.include_router(log_router)
