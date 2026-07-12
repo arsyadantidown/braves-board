@@ -97,17 +97,19 @@ Jika semua kontainer berstatus "Up", Anda bisa mengakses berbagai layanan beriku
 
 ## Manajemen Database (Alembic Migrations)
 
-Aplikasi ini menggunakan layanan terpisah (`migrator`) untuk mengeksekusi migrasi database secara terisolasi.
+Aplikasi ini menggunakan layanan terpisah (`migrator`) untuk mengeksekusi migrasi database secara terisolasi dengan menjalankan *script* [migrator.sh](file:///Users/heru/Development/braves-board/deploy/docker/entrypoints/migrator.sh).
+
+Karena kontainer `migrator` tidak menggunakan *live volume mount* untuk direktori kode `/app` (untuk meniru lingkungan staging/production), Anda **wajib menggunakan flag `--build`** saat menjalankan migrasi baru agar file migrasi terbaru di lokal ikut disalin ke dalam kontainer.
 
 ### 1. Menerapkan Migrasi (Upgrade ke Head)
 
-Untuk menjalankan semua file migrasi yang ada dan memperbarui struktur tabel di PostgreSQL, jalankan *service* `migrator`. *Script* `migrator.sh` akan otomatis mengeksekusi `alembic upgrade head`.
+Untuk menjalankan semua file migrasi yang ada dan memperbarui struktur tabel di PostgreSQL, jalankan *service* `migrator` dengan perintah berikut:
 
 ```bash
-docker-compose -f deploy/compose/docker-compose.dev.yml up migrator
-````
+docker-compose -f deploy/compose/docker-compose.dev.yml up --build migrator
+```
 
-*(Catatan: Kontainer `migrator` akan otomatis berhenti (exit) setelah proses migrasi selesai. Ini adalah perilaku normal).*
+*(Catatan: Flag `--build` memastikan file migrasi baru yang Anda buat di mesin lokal disalin ke dalam image kontainer sebelum migrasi dieksekusi. Kontainer `migrator` akan otomatis berhenti setelah proses selesai).*
 
 ---
 
@@ -129,7 +131,7 @@ Setelah model didaftarkan atau diubah, buat skrip migrasinya dengan mengeksekusi
 docker-compose -f deploy/compose/docker-compose.dev.yml exec api alembic revision --autogenerate -m "nama_perubahan_anda"
 ```
 
-*(Setelah file migrasi terbentuk, jalankan kembali langkah 1 (`up migrator`) untuk menerapkannya ke database).*
+*(Setelah file migrasi baru terbentuk di lokal, jalankan kembali Langkah 1 (`up --build migrator`) untuk menerapkannya ke database).*
 
 ---
 

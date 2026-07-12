@@ -1,4 +1,5 @@
 from fastapi import HTTPException, status
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
@@ -26,35 +27,17 @@ class NonceMiddleware(BaseHTTPMiddleware):
 
         nonce = request.headers.get("X-Request-Nonce")
         if not nonce:
-            from fastapi.responses import JSONResponse
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                content={
-                    "success": False,
-                    "data": None,
-                    "error": {
-                        "code": "BAD_REQUEST",
-                        "message": "X-Request-Nonce header is required for non-idempotent requests",
-                        "request_id": getattr(request.state, "request_id", None)
-                    }
-                }
+                content={"detail": "X-Request-Nonce header is required for non-idempotent requests"},
             )
 
         key = f"nonce:{nonce}"
         exists = await redis_client.exists(key)
         if exists:
-            from fastapi.responses import JSONResponse
             return JSONResponse(
                 status_code=status.HTTP_409_CONFLICT,
-                content={
-                    "success": False,
-                    "data": None,
-                    "error": {
-                        "code": "CONFLICT",
-                        "message": "Replay attack detected: duplicate nonce",
-                        "request_id": getattr(request.state, "request_id", None)
-                    }
-                }
+                content={"detail": "Replay attack detected: duplicate nonce"},
             )
 
         async with redis_client.pipeline(transaction=True) as pipe:
