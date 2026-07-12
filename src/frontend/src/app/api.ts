@@ -5,7 +5,7 @@ const api = axios.create({
   baseURL: '/api/v1',
 })
 
-// 🔥 AUTO INJECT TOKEN
+// Auto injerct token & nonce
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token')
 
@@ -13,8 +13,26 @@ api.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${token}`
   }
 
+  if (config.method && ['post', 'put', 'patch', 'delete'].includes(config.method.toLowerCase())) {
+    config.headers['X-Request-Nonce'] = crypto.randomUUID()
+  }
+
   return config
 })
+
+let isRefreshing = false
+let failedQueue: { resolve: (token: string) => void; reject: (err: any) => void }[] = []
+
+const processQueue = (error: any, token: string | null = null) => {
+  failedQueue.forEach(prom => {
+    if (error) {
+      prom.reject(error)
+    } else {
+      prom.resolve(token as string)
+    }
+  })
+  failedQueue = []
+}
 
 // Response interceptor: auto-refresh jika 401
 api.interceptors.response.use(
@@ -23,21 +41,42 @@ api.interceptors.response.use(
     const originalRequest = error.config
 
     if (error.response?.status === 401 && !originalRequest._retry) {
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject })
+        })
+          .then((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`
+            return api(originalRequest)
+          })
+          .catch((err) => Promise.reject(err))
+      }
+
       originalRequest._retry = true
+      isRefreshing = true
 
       try {
-        const { data } = await api.post('/auth/refresh')
+        // Use regular axios to avoid interceptor infinite loop
+        const { data } = await axios.post('/api/v1/auth/refresh', {}, {
+          headers: {
+            'X-Request-Nonce': crypto.randomUUID()
+          }
+        })
         const newToken = data.data?.access_token || data.access_token
 
         if (newToken) {
           localStorage.setItem('access_token', newToken)
+          processQueue(null, newToken)
           originalRequest.headers.Authorization = `Bearer ${newToken}`
           return api(originalRequest)
         }
-      } catch {
+      } catch (refreshError) {
+        processQueue(refreshError, null)
         localStorage.removeItem('access_token')
         localStorage.removeItem('user')
         window.location.href = '/'
+      } finally {
+        isRefreshing = false
       }
     }
 

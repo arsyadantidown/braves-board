@@ -20,34 +20,7 @@
         </button>
       </div>
 
-      <!-- REMINDER NOTIFICATION POPUP -->
-      <Transition name="reminder">
-        <div
-          v-if="showReminder"
-          class="absolute top-14 right-4 z-50 bg-white rounded-xl shadow-lg border border-gray-200 p-4 w-72"
-        >
-          <p class="text-xs font-semibold text-gray-500 mb-1">Reminder Notification</p>
-          <p class="text-sm text-gray-700 leading-snug">
-            you have been working on
-            <span class="text-blue-500 font-medium">{{ reminder.task }}</span>
-            for {{ reminder.duration }}. Still working on it?
-          </p>
-          <div class="flex gap-2 mt-3">
-            <button
-              @click="handleYes"
-              class="px-4 py-1.5 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition text-gray-700"
-            >
-              yes
-            </button>
-            <button
-              @click="handleNo"
-              class="px-4 py-1.5 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition text-gray-700"
-            >
-              No
-            </button>
-          </div>
-        </div>
-      </Transition>
+
     </div>
 
     <div class="flex flex-1 overflow-hidden">
@@ -60,75 +33,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import { faQuestion, faBell, faUser } from '@fortawesome/free-solid-svg-icons'
 import AppSidebar from './AppSidebar.vue'
 
 library.add(faQuestion, faBell, faUser)
-
-// ── Reminder state ────────────────────────────────────────────────────────────
-
-const showReminder = ref(false)
-
-const reminder = ref({
-  task: 'Snap Journal - Fixing some bu..',
-  duration: '3 hours',
-})
-
-// Dummy reminders pool — bisa diganti data real
-const reminders = [
-  { task: 'Snap Journal - Fixing some bu..', duration: '3 hours' },
-  { task: 'Braves Board - UI Revamp..', duration: '1.5 hours' },
-  { task: 'FS Internship - API Integration..', duration: '2 hours' },
-]
-
-let reminderTimer: ReturnType<typeof setTimeout> | null = null
-
-function showNextReminder() {
-  const random = reminders[Math.floor(Math.random() * reminders.length)]
-  reminder.value = random
-  showReminder.value = true
-}
-
-function scheduleNext() {
-  // Tampil lagi setiap 30 detik (ganti ke interval yang sesuai di production)
-  reminderTimer = setTimeout(() => {
-    showNextReminder()
-  }, 30_000)
-}
-
-function handleYes() {
-  showReminder.value = false
-  scheduleNext()
-}
-
-function handleNo() {
-  showReminder.value = false
-  scheduleNext()
-}
-
-onMounted(() => {
-  // Tampil pertama kali setelah 3 detik
-  reminderTimer = setTimeout(() => {
-    showNextReminder()
-  }, 3_000)
-})
-
-onUnmounted(() => {
-  if (reminderTimer) clearTimeout(reminderTimer)
-})
 </script>
-
-<style scoped>
-.reminder-enter-active,
-.reminder-leave-active {
-  transition: opacity 0.25s ease, transform 0.25s ease;
-}
-.reminder-enter-from,
-.reminder-leave-to {
-  opacity: 0;
-  transform: translateY(-6px);
-}
-</style>

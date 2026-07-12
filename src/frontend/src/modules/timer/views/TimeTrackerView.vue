@@ -149,7 +149,7 @@ function startPing(taskId: string) {
   stopPing()
   pingInterval = setInterval(async () => {
     try { await pingTimerApi(taskId) } catch {}
-  }, 30000)
+  }, 120000)
 }
 function stopPing() {
   if (pingInterval) { clearInterval(pingInterval); pingInterval = null }

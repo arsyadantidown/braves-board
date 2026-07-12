@@ -1,14 +1,7 @@
 // src/services/timerService.ts
 // Semua API call yang berhubungan dengan Task Timer
 
-import axios from 'axios'
-
-const http = axios.create({ baseURL: 'http://localhost:8000/api/v1' })
-http.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token')
-  if (token) config.headers.Authorization = `Bearer ${token}`
-  return config
-})
+import http from '../../../app/api'
 
 export async function startTimer(taskId: string) {
   await http.post(`/tasks/${taskId}/timer/start`)
@@ -28,6 +21,7 @@ export async function confirmTimer(taskId: string) {
 
 export async function getTimerLogs(taskId: string) {
   const res = await http.get(`/tasks/${taskId}/timer/logs`)
-  const data = res.data?.data ?? res.data ?? []
-  return Array.isArray(data) ? data : []
+  const data = res.data?.data ?? res.data ?? {}
+  const logs = data.logs ?? []
+  return Array.isArray(logs) ? logs : []
 }

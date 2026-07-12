@@ -1,16 +1,10 @@
 // src/modules/board/api/board.api.ts
 // Semua API call yang berhubungan dengan Boards
 
-import axios from 'axios'
 import api from '../../../app/api'
 
-// http — axios instance khusus untuk endpoint yang tidak pakai /api/v1
-const http = axios.create({ baseURL: 'http://localhost:8000/api/v1' })
-http.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token')
-  if (token) config.headers.Authorization = `Bearer ${token}`
-  return config
-})
+// Menggunakan centralized API client untuk semua endpoint
+const http = api
 
 // ─── Boards ───────────────────────────────────────────────────
 
