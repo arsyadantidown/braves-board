@@ -1,11 +1,4 @@
-import axios from 'axios'
-
-const http = axios.create({ baseURL: 'http://localhost:8000/api/v1' })
-http.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token')
-  if (token) config.headers.Authorization = `Bearer ${token}`
-  return config
-})
+import http from '../../../app/api'
 
 export async function getTasks(columnId: string) {
   const res = await http.get('/tasks', { params: { column_id: columnId } })
@@ -34,7 +27,7 @@ export async function deleteTask(taskId: string) {
 export async function moveTask(taskId: string, columnId: string, position?: number) {
   const res = await http.patch(`/tasks/${taskId}/move`, {
     column_id: columnId,
-    position: position ?? 0  // ← tambah ini
+    position: position ?? 0 
   })
   return res.data?.data ?? res.data
 }

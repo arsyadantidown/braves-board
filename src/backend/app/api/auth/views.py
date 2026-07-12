@@ -83,7 +83,7 @@ async def google_callback(
     try:
         result = await AuthUseCase.handle_google_callback(code, oauth_nonce, user_repo)
 
-        redirect_url = f"{settings.FRONTEND_URL}/dashboard"
+        redirect_url = f"{settings.FRONTEND_URL}/dashboard?access_token={result['access_token']}"
         redirect_response = RedirectResponse(url=redirect_url)
 
         redirect_response.delete_cookie("oauth_state", path="/")

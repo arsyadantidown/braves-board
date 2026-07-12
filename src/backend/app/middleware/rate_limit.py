@@ -18,7 +18,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.default_window = default_window
 
         self.strict_paths = {
-            "/api/v1/auth": {"limit": 5, "window": 60},
+            "/api/v1/auth/google": {"limit": 5, "window": 60},
+            "/api/v1/auth": {"limit": 20, "window": 60},
             "/api/v1/tasks": {"limit": 20, "window": 60},
         }
 

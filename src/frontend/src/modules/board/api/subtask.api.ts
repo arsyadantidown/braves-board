@@ -1,11 +1,4 @@
-import axios from 'axios'
-
-const http = axios.create({ baseURL: 'http://localhost:8000/api/v1' })
-http.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token')
-  if (token) config.headers.Authorization = `Bearer ${token}`
-  return config
-})
+import http from '../../../app/api'
 
 export async function createSubtask(taskId: string, title: string) {
   const res = await http.post(`/tasks/${taskId}/subtasks`, { title })

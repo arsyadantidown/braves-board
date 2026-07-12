@@ -546,8 +546,12 @@
           <div v-else class="space-y-1.5">
             <div v-for="(log, i) in timerLogs" :key="i"
               class="flex justify-between text-xs text-gray-600 border-b border-gray-100 pb-1">
-              <span>{{ log.started_at ?? log.start ?? '-' }}</span>
-              <span class="font-medium text-gray-800">{{ log.duration ?? '-' }}</span>
+              <span>{{ log.start_time ? new Date(log.start_time).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-' }}</span>
+              <span class="font-medium text-gray-800">{{ log.duration_seconds !== undefined ? formatTimer(log.duration_seconds) : '-' }}</span>
+            </div>
+            <div class="flex justify-between text-sm text-gray-800 font-bold pt-2 mt-2">
+              <span>Total Time</span>
+              <span>{{ formatTimer(timerLogs.reduce((sum, log) => sum + (log.duration_seconds || 0), 0)) }}</span>
             </div>
           </div>
         </div>
@@ -571,7 +575,7 @@
 import draggable from 'vuedraggable'
 import { VueDraggable } from 'vue-draggable-plus'
 import { moveTask as apiMoveTask } from '../api/task.api'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import Layout from '../../../components/common/AppLayout.vue'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
@@ -636,6 +640,7 @@ interface Task {
 library.add(faClock, faPlay, faStop, faPlus, faTag, faCheckSquare, faPaperclip, faAlignLeft, faEye, faImage, faEllipsisH, faTimes, faCommentAlt)
 
 const route = useRoute()
+const router = useRouter()
 const boardId = route.params.boardId as string
 const store = useAppStore()
 const { columnsByBoard } = storeToRefs(store)
@@ -724,7 +729,7 @@ function startPing(taskId: string) {
   if (pingInterval) clearInterval(pingInterval)
   pingInterval = setInterval(async () => {
     try { await apiPingTimer(taskId) } catch { }
-  }, 30000)
+  }, 120000)
 }
 
 function stopPing() {
@@ -869,11 +874,8 @@ async function initBoards() {
     await store.fetchColumns(boardId)
   } catch (e: any) {
     console.error('fetchColumns error:', e?.response?.status, e?.response?.data)
-    // ← jangan crash, inisialisasi kosong saja
-    if (!store.columnsByBoard[boardId]) {
-      store.columnsByBoard[boardId] = []
-    }
-    showToast('Gagal memuat columns.')
+    showToast('Akses ditolak atau Board tidak ditemukan.')
+    router.replace('/boards')
   }
 }
 
