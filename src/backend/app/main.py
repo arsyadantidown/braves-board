@@ -77,3 +77,39 @@ app.add_api_route(
 
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(api_router)
+
+from fastapi.openapi.utils import get_openapi
+from app.middleware.nonce import EXEMPT_PATHS, PROTECTED_METHODS
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        openapi_version=app.openapi_version,
+        description=app.description,
+        routes=app.routes,
+    )
+    
+    protected_methods = {m.lower() for m in PROTECTED_METHODS}
+    
+    for path, path_item in openapi_schema.get("paths", {}).items():
+        if path in EXEMPT_PATHS:
+            continue
+        for method, operation in path_item.items():
+            if method.lower() in protected_methods:
+                if "parameters" not in operation:
+                    operation["parameters"] = []
+                operation["parameters"].append({
+                    "name": "X-Request-Nonce",
+                    "in": "header",
+                    "required": False,
+                    "schema": {"type": "string"},
+                    "description": "Unique nonce for replay attack protection."
+                })
+    
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi

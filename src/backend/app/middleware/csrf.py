@@ -1,4 +1,5 @@
 from fastapi import HTTPException, status
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
@@ -36,21 +37,21 @@ class CSRFMiddleware(BaseHTTPMiddleware):
 
         if origin:
             if origin not in allowed_origins:
-                raise HTTPException(
+                return JSONResponse(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Invalid origin",
+                    content={"detail": "Invalid origin"},
                 )
         elif referer:
             if not any(referer.startswith(allowed) for allowed in allowed_origins):
-                raise HTTPException(
+                return JSONResponse(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Invalid referer",
+                    content={"detail": "Invalid referer"},
                 )
         else:
             if settings.APP_ENV == "production":
-                raise HTTPException(
+                return JSONResponse(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Missing origin or referer headers",
+                    content={"detail": "Missing origin or referer headers"},
                 )
 
         return await call_next(request)
