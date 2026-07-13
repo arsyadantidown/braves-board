@@ -15,3 +15,4 @@ class Board(Base):
     deleted_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), index=True, nullable=True)
 
     columns = relationship("Column", back_populates="board")
+    members = relationship("BoardMember", back_populates="board")

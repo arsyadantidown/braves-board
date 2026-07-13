@@ -3,92 +3,125 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.connections.postgres import get_db
-from app.api.task.schema import TaskCreateRequest, TaskUpdateRequest, TaskMoveRequest, TaskReorderRequest
+from app.api.task.schema import (
+    TaskCreateRequest,
+    TaskUpdateRequest,
+    TaskMoveRequest,
+    TaskReorderRequest,
+)
 from app.api.task.use_cases import TaskUseCase
-from app.api.depedencies import get_current_user
 from app.models.user_model import User
 from app.api.standard_response import success_response
-from app.api.exceptions.task_exceptions import InvalidUUIDFormatException
+
+from app.core.dependencies import require_permission
+
 
 router = APIRouter(prefix="/api/v1/tasks", tags=["Tasks"])
 
-def get_task_use_case(db: AsyncSession = Depends(get_db)) -> TaskUseCase:
+
+def get_task_use_case(
+    db: AsyncSession = Depends(get_db)
+) -> TaskUseCase:
     return TaskUseCase(db)
 
-def validate_uuid(id_str: str) -> uuid.UUID:
-    try:
-        return uuid.UUID(str(id_str))
-    except ValueError:
-        raise InvalidUUIDFormatException()
 
 @router.get("", status_code=status.HTTP_200_OK)
 async def get_tasks(
-    column_id: str,
+    column_id: uuid.UUID,
     use_case: TaskUseCase = Depends(get_task_use_case),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(
+        require_permission("task.view")
+    ),
 ):
-    valid_column_id = validate_uuid(column_id)
-    result = await use_case.get_tasks_by_column(valid_column_id)
+    result = await use_case.get_tasks_by_column(
+        column_id
+    )
     return success_response(result)
+
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_task(
-    request: TaskCreateRequest,
+    payload: TaskCreateRequest,
     use_case: TaskUseCase = Depends(get_task_use_case),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(
+        require_permission("task.create")
+    ),
 ):
-    result = await use_case.create_task(request)
+    result = await use_case.create_task(payload)
     return success_response(result)
 
-@router.get("/{id}", status_code=status.HTTP_200_OK)
+
+@router.get("/{task_id}", status_code=status.HTTP_200_OK)
 async def get_task_detail(
-    id: str,
+    task_id: uuid.UUID,
     use_case: TaskUseCase = Depends(get_task_use_case),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(
+        require_permission("task.view")
+    ),
 ):
-    valid_id = validate_uuid(id)
-    result = await use_case.get_task_detail(valid_id)
+    result = await use_case.get_task_detail(
+        task_id
+    )
     return success_response(result)
 
-@router.patch("/{id}", status_code=status.HTTP_200_OK)
+
+@router.patch("/{task_id}", status_code=status.HTTP_200_OK)
 async def update_task(
-    id: str,
-    request: TaskUpdateRequest,
+    task_id: uuid.UUID,
+    payload: TaskUpdateRequest,
     use_case: TaskUseCase = Depends(get_task_use_case),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(
+        require_permission("task.update")
+    ),
 ):
-    valid_id = validate_uuid(id)
-    result = await use_case.update_task(valid_id, request)
+    result = await use_case.update_task(
+        task_id,
+        payload,
+    )
     return success_response(result)
 
-@router.patch("/{id}/move", status_code=status.HTTP_200_OK)
+
+@router.patch("/{task_id}/move", status_code=status.HTTP_200_OK)
 async def move_task(
-    id: str,
-    request: TaskMoveRequest,
+    task_id: uuid.UUID,
+    payload: TaskMoveRequest,
     use_case: TaskUseCase = Depends(get_task_use_case),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(
+        require_permission("task.update")
+    ),
 ):
-    valid_id = validate_uuid(id)
-    result = await use_case.move_task(valid_id, request)
+    result = await use_case.move_task(
+        task_id,
+        payload,
+    )
     return success_response(result)
 
-@router.patch("/{id}/reorder", status_code=status.HTTP_200_OK)
+
+@router.patch("/{task_id}/reorder", status_code=status.HTTP_200_OK)
 async def reorder_task(
-    id: str,
-    request: TaskReorderRequest,
+    task_id: uuid.UUID,
+    payload: TaskReorderRequest,
     use_case: TaskUseCase = Depends(get_task_use_case),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(
+        require_permission("task.update")
+    ),
 ):
-    valid_id = validate_uuid(id)
-    result = await use_case.reorder_task(valid_id, request)
+    result = await use_case.reorder_task(
+        task_id,
+        payload,
+    )
     return success_response(result)
 
-@router.delete("/{id}", status_code=status.HTTP_200_OK)
+
+@router.delete("/{task_id}", status_code=status.HTTP_200_OK)
 async def delete_task(
-    id: str,
+    task_id: uuid.UUID,
     use_case: TaskUseCase = Depends(get_task_use_case),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(
+        require_permission("task.delete")
+    ),
 ):
-    valid_id = validate_uuid(id)
-    await use_case.delete_task(valid_id)
+    await use_case.delete_task(
+        task_id
+    )
     return success_response(None)

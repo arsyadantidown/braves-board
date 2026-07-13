@@ -10,6 +10,8 @@ from app.api.column.repository import ColumnRepository
 from app.api.task.repository import TaskRepository
 from app.api.time_tracking.repository import TimeLogRepository
 from app.api.exceptions.board_exceptions import BoardNotFoundException, InvalidBoardUpdateException
+from app.api.board_member.repository import BoardMemberRepository
+from app.models.board_member_model import BoardRole
 
 
 class BoardUseCase:
@@ -19,6 +21,7 @@ class BoardUseCase:
         self.column_repo = ColumnRepository(session)
         self.task_repo = TaskRepository(session)
         self.time_log_repo = TimeLogRepository(session)
+        self.board_member_repo = BoardMemberRepository(session)
 
     def _board_to_dict(self, board):
         return {
@@ -215,6 +218,13 @@ class BoardUseCase:
 
     async def create(self, board_in: BoardCreate, user_id: uuid.UUID):
         board = await self.repo.create(board_in, user_id)
+
+        await self.board_member_repo.create(
+            board_id=board.id,
+            user_id=user_id,
+            role=BoardRole.OWNER
+        )
+
         return self._board_to_dict(board)
 
     async def update(self, board_id: uuid.UUID, update_data: dict, user_id: uuid.UUID):
