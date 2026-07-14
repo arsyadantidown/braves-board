@@ -318,12 +318,15 @@
             </div>
 
             <div class="mb-6 p-3 bg-gray-50 border border-gray-200 rounded-xl">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2">
+              <div class="flex items-center justify-between gap-3">
+                <div class="flex items-center gap-2 flex-shrink-0">
                   <font-awesome-icon icon="clock" class="text-gray-500 text-sm" />
                   <p class="text-sm font-semibold text-gray-700">Time Tracker</p>
                 </div>
-                <div class="flex items-center gap-2">
+                <input v-if="activeTimerTaskId !== selectedTask.id" v-model="timerDescription" type="text"
+                  placeholder="Sedang mengerjakan apa? (opsional)"
+                  class="flex-1 min-w-0 text-xs text-gray-600 border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-400 transition placeholder-gray-400" />
+                <div class="flex items-center gap-2 flex-shrink-0">
                   <span class="text-sm font-mono font-semibold"
                     :class="activeTimerTaskId === selectedTask.id ? 'text-green-600' : 'text-gray-500'">
                     {{ activeTimerTaskId === selectedTask.id ? formatTimer(timerSeconds[selectedTask.id] || 0) :
@@ -355,11 +358,20 @@
                 <p v-else-if="timerLogsError" class="text-xs text-red-500">{{ timerLogsError }}</p>
                 <p v-else-if="!timerLogs.length" class="text-xs text-gray-400">Belum ada time log.</p>
 
-                <ul v-else class="space-y-1 max-h-40 overflow-y-auto">
+                <ul v-else class="space-y-1.5 max-h-40 overflow-y-auto">
                   <li v-for="log in timerLogs" :key="log.id"
-                    class="flex items-baseline justify-between gap-3 text-xs py-1 border-b border-gray-100 last:border-0">
-                    <span class="text-gray-400 flex-shrink-0 w-20">{{ formatLogDate(log.start_time) }}</span>
-                    <span class="text-gray-700 tabular-nums flex-1">{{ formatTimerLog(log) }}</span>
+                    class="py-1 border-b border-gray-100 last:border-0">
+                    <div class="flex items-baseline justify-between gap-3 text-xs">
+                      <span class="text-gray-400 flex-shrink-0 w-20">{{ formatLogDate(log.start_time) }}</span>
+                      <span class="text-gray-700 tabular-nums flex-1">{{ formatTimerLog(log) }}</span>
+                      <span v-if="formatStopReason(log.stop_reason)"
+                        class="flex-shrink-0 text-[10px] font-medium text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-1.5 py-0.5">
+                        {{ formatStopReason(log.stop_reason) }}
+                      </span>
+                    </div>
+                    <p v-if="log.activity_description" class="text-xs text-gray-400 mt-0.5 pl-20 truncate">
+                      {{ log.activity_description }}
+                    </p>
                   </li>
                 </ul>
               </div>
@@ -598,6 +610,7 @@ import {
   formatDuration,
   formatLogDate,
   formatTimerLog,
+  formatStopReason,
   totalDurationSeconds,
 } from '../../timer/utils/timer.format'
 import type { TimerLog } from '../../timer/utils/timer.format'
@@ -688,6 +701,7 @@ const timerSeconds = ref<Record<string, number>>({})
 const timerLogs = ref<TimerLog[]>([])
 const timerLogsLoading = ref(false)
 const timerLogsError = ref('')
+const timerDescription = ref('')
 let tickInterval: ReturnType<typeof setInterval> | null = null
 let pingInterval: ReturnType<typeof setInterval> | null = null
 let toastTimer: ReturnType<typeof setTimeout> | null = null
@@ -792,11 +806,12 @@ async function handleTimerToggle(task: Task) {
     await doStopTimer(task.id)
   } else {
     try {
-      await apiStartTimer(task.id)
+      await apiStartTimer(task.id, timerDescription.value)
       activeTimerTaskId.value = task.id
       if (!timerSeconds.value[task.id]) timerSeconds.value[task.id] = 0
       localStorage.setItem('active_timer_task_id', task.id)
       localStorage.setItem('active_timer_task_title', task.title ?? '')
+      timerDescription.value = ''
       startTick(task.id)
       startPing(task.id)
       logActivity('started timer on this card')
@@ -1016,6 +1031,7 @@ function openModal(task: Task) {
 
   timerLogs.value = []
   timerLogsError.value = ''
+  timerDescription.value = ''
   loadTimerLogs(task.id)
 }
 
@@ -1023,6 +1039,7 @@ function closeModal() {
   selectedTask.value = null
   timerLogs.value = []
   timerLogsError.value = ''
+  timerDescription.value = ''
   closeAllDropdowns()
 }
 

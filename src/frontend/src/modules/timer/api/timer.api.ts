@@ -4,8 +4,9 @@
 import http from '../../../app/api'
 import type { TimerLog } from '../utils/timer.format'
 
-export async function startTimer(taskId: string) {
-  await http.post(`/tasks/${taskId}/timer/start`)
+export async function startTimer(taskId: string, description?: string) {
+  const trimmed = description?.trim()
+  await http.post(`/tasks/${taskId}/timer/start`, trimmed ? { description: trimmed } : {})
 }
 
 export async function stopTimer(taskId: string) {

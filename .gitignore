@@ -70,4 +70,4 @@ htmlcov/
 # =========================
 # Docker
 # =========================
-docker-compose.override.yml
+docker-compose.override.ymlCLAUDE.md

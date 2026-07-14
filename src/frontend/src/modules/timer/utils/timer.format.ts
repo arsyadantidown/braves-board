@@ -80,3 +80,23 @@ export function formatTimerLog(log: TimerLog): string {
 export function totalDurationSeconds(logs: TimerLog[]): number {
   return logs.reduce((sum, log) => sum + Math.max(0, log.duration_seconds ?? 0), 0)
 }
+
+/**
+ * stop_reason → label singkat. "manual" (dihentikan user) tidak butuh label,
+ * sisanya (auto-stop oleh backend) ditandai supaya kelihatan bukan aksi sengaja.
+ */
+export function formatStopReason(reason: string | null): string | null {
+  switch (reason) {
+    case null:
+    case 'manual':
+      return null
+    case 'normal_close':
+      return 'Tab ditutup'
+    case 'no_response':
+      return 'Tidak ada respons'
+    case 'unexpected_close':
+      return 'Auto-stop (idle)'
+    default:
+      return reason
+  }
+}
