@@ -1,7 +1,8 @@
-// src/services/timerService.ts
+// src/modules/timer/api/timer.api.ts
 // Semua API call yang berhubungan dengan Task Timer
 
 import http from '../../../app/api'
+import type { TimerLog } from '../utils/timer.format'
 
 export async function startTimer(taskId: string) {
   await http.post(`/tasks/${taskId}/timer/start`)
@@ -19,7 +20,7 @@ export async function confirmTimer(taskId: string) {
   await http.post(`/tasks/${taskId}/timer/confirm`)
 }
 
-export async function getTimerLogs(taskId: string) {
+export async function getTimerLogs(taskId: string): Promise<TimerLog[]> {
   const res = await http.get(`/tasks/${taskId}/timer/logs`)
   const data = res.data?.data ?? res.data ?? {}
   const logs = data.logs ?? []

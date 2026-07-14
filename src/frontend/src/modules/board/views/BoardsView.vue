@@ -254,15 +254,10 @@
                 class="flex items-center gap-1.5 text-xs border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 text-gray-600 transition">
                 <font-awesome-icon icon="check-square" /> Checklist
               </button>
-              <button @click.stop="showAttachPanel = !showAttachPanel; showTimerLogs = false"
+              <button @click.stop="showAttachPanel = !showAttachPanel"
                 class="flex items-center gap-1.5 text-xs border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 text-gray-600 transition"
                 :class="showAttachPanel ? 'bg-gray-100 border-gray-400' : ''">
                 <font-awesome-icon icon="paperclip" /> Attachment
-              </button>
-              <button @click.stop="handleFetchTimerLogs(selectedTask.id); showAttachPanel = false"
-                class="flex items-center gap-1.5 text-xs border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 text-gray-600 transition"
-                :class="showTimerLogs ? 'bg-gray-100 border-gray-400' : ''">
-                <font-awesome-icon icon="clock" /> Timer Logs
               </button>
             </div>
 
@@ -345,6 +340,28 @@
                     Confirm
                   </button>
                 </div>
+              </div>
+
+              <!-- Riwayat time log: "13:00 → 16:00, 3 jam" -->
+              <div class="mt-3 pt-3 border-t border-gray-200">
+                <div class="flex items-center justify-between mb-2">
+                  <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Time Logs</p>
+                  <span v-if="timerLogs.length" class="text-xs text-gray-500">
+                    Total {{ formatDuration(totalDurationSeconds(timerLogs)) }}
+                  </span>
+                </div>
+
+                <p v-if="timerLogsLoading" class="text-xs text-gray-400">Memuat…</p>
+                <p v-else-if="timerLogsError" class="text-xs text-red-500">{{ timerLogsError }}</p>
+                <p v-else-if="!timerLogs.length" class="text-xs text-gray-400">Belum ada time log.</p>
+
+                <ul v-else class="space-y-1 max-h-40 overflow-y-auto">
+                  <li v-for="log in timerLogs" :key="log.id"
+                    class="flex items-baseline justify-between gap-3 text-xs py-1 border-b border-gray-100 last:border-0">
+                    <span class="text-gray-400 flex-shrink-0 w-20">{{ formatLogDate(log.start_time) }}</span>
+                    <span class="text-gray-700 tabular-nums flex-1">{{ formatTimerLog(log) }}</span>
+                  </li>
+                </ul>
               </div>
             </div>
 
@@ -534,28 +551,6 @@
           </div>
         </div>
 
-        <!-- Timer Logs Panel -->
-        <div v-if="showTimerLogs"
-          class="border-t border-gray-100 px-6 py-4 bg-gray-50 flex-shrink-0 max-h-48 overflow-y-auto">
-          <div class="flex items-center justify-between mb-2">
-            <p class="text-sm font-semibold text-gray-700">Timer Logs</p>
-            <button @click="showTimerLogs = false" class="text-gray-400 hover:text-gray-600 text-xs">✕</button>
-          </div>
-          <div v-if="timerLogsLoading" class="text-xs text-gray-400">Loading...</div>
-          <div v-else-if="timerLogs.length === 0" class="text-xs text-gray-400">No logs yet.</div>
-          <div v-else class="space-y-1.5">
-            <div v-for="(log, i) in timerLogs" :key="i"
-              class="flex justify-between text-xs text-gray-600 border-b border-gray-100 pb-1">
-              <span>{{ log.start_time ? new Date(log.start_time).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-' }}</span>
-              <span class="font-medium text-gray-800">{{ log.duration_seconds !== undefined ? formatTimer(log.duration_seconds) : '-' }}</span>
-            </div>
-            <div class="flex justify-between text-sm text-gray-800 font-bold pt-2 mt-2">
-              <span>Total Time</span>
-              <span>{{ formatTimer(timerLogs.reduce((sum, log) => sum + (log.duration_seconds || 0), 0)) }}</span>
-            </div>
-          </div>
-        </div>
-
       </div>
     </div>
   </Teleport>
@@ -598,6 +593,14 @@ import {
   confirmTimer as apiConfirmTimer,
   getTimerLogs as apiGetTimerLogs,
 } from '../../timer/api/timer.api'
+import {
+  formatTimer,
+  formatDuration,
+  formatLogDate,
+  formatTimerLog,
+  totalDurationSeconds,
+} from '../../timer/utils/timer.format'
+import type { TimerLog } from '../../timer/utils/timer.format'
 import { useAppStore } from '../store/board.store'
 import { storeToRefs } from 'pinia'
 
@@ -682,21 +685,14 @@ const subtaskCreating = ref(false)
 // ─── Timer State ──────────────────────────────────────────────
 const activeTimerTaskId = ref<string | null>(null)
 const timerSeconds = ref<Record<string, number>>({})
-const timerLogs = ref<any[]>([])
-const showTimerLogs = ref(false)
+const timerLogs = ref<TimerLog[]>([])
 const timerLogsLoading = ref(false)
+const timerLogsError = ref('')
 let tickInterval: ReturnType<typeof setInterval> | null = null
 let pingInterval: ReturnType<typeof setInterval> | null = null
 let toastTimer: ReturnType<typeof setTimeout> | null = null
 
 // ─── Helpers ──────────────────────────────────────────────────
-function formatTimer(seconds: number): string {
-  const h = String(Math.floor(seconds / 3600)).padStart(2, '0')
-  const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0')
-  const s = String(seconds % 60).padStart(2, '0')
-  return `${h}:${m}:${s}`
-}
-
 function findTaskById(id: string): Task | null {
   for (const board of boards.value) {
     const t = (board.tasks ?? []).find((t: Task) => t.id === id)
@@ -823,6 +819,11 @@ async function doStopTimer(taskId: string) {
     const task = findTaskById(taskId)
     if (task) logActivityOn(task, `stopped timer — ${formatTimer(elapsed)}`)
     showToast(`Timer stopped ⏹ — ${formatTimer(elapsed)}`)
+
+    // Log baru baru tercatat di backend setelah stop — tarik ulang biar langsung tampil.
+    if (selectedTask.value?.id === taskId) {
+      await loadTimerLogs(taskId)
+    }
   } catch (e: any) {
     showToast(e?.response?.data?.error?.message || 'Gagal menghentikan timer.')
   }
@@ -837,15 +838,15 @@ async function handleConfirmTimer(taskId: string) {
   }
 }
 
-async function handleFetchTimerLogs(taskId: string) {
+async function loadTimerLogs(taskId: string) {
   if (!taskId) return
   timerLogsLoading.value = true
-  showTimerLogs.value = true
+  timerLogsError.value = ''
   try {
     timerLogs.value = await apiGetTimerLogs(taskId)
-  } catch {
-    showTimerLogs.value = false
-    showToast('Gagal memuat timer logs.')
+  } catch (e: any) {
+    timerLogs.value = []
+    timerLogsError.value = e?.response?.data?.error?.message || 'Gagal memuat time log.'
   } finally {
     timerLogsLoading.value = false
   }
@@ -1008,16 +1009,20 @@ const visibleChecklist = computed(() => {
 
 // ─── Modal ────────────────────────────────────────────────────
 function openModal(task: Task) {
-  console.log('openModal task:', JSON.stringify(task))
   selectedTask.value = task
   closeAllDropdowns()
   showAddChecklist.value = false
   showAttachPanel.value = false
-  showTimerLogs.value = false
+
+  timerLogs.value = []
+  timerLogsError.value = ''
+  loadTimerLogs(task.id)
 }
 
 function closeModal() {
   selectedTask.value = null
+  timerLogs.value = []
+  timerLogsError.value = ''
   closeAllDropdowns()
 }
 
