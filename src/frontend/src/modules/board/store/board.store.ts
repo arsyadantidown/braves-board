@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { getBoards, createBoard as apiCreateBoard } from '../api/board.api'
+import { getBoards, createBoard as apiCreateBoard, getUsers as apiGetUsers } from '../api/board.api'
 import { getColumns, createColumn as apiCreateColumn } from '../api/column.api'
 import {
   getTasks,
@@ -27,6 +27,17 @@ export const useAppStore = defineStore('app', () => {
     const board = await apiCreateBoard(title)
     boards.value.push(board)
     return board
+  }
+
+  // ─── Users ────────────────────────────────────────────
+  const users = ref<any[]>([])
+  const usersLoaded = ref(false)
+
+  async function fetchUsers(force = false) {
+    if (usersLoaded.value && !force) return
+    const res = await apiGetUsers()
+    users.value = Array.isArray(res) ? res : res.items ?? res.data ?? []
+    usersLoaded.value = true
   }
 
   // ─── Columns ──────────────────────────────────────────
@@ -60,13 +71,12 @@ export const useAppStore = defineStore('app', () => {
     return {
       id: task.id,
       title: task.title,
-      checklist: task.checklist ?? [],
       subtasks: (task.subtasks ?? []).map((s: any) => ({
         id: s.id,
         title: s.title,
-        completed: s.completed ?? false,
+        completed: s.is_completed ?? s.completed ?? false,
       })),
-      members: task.members ?? [],
+      assignee_ids: task.assignee_ids ?? [],
       activity: task.activity ?? [],
       attachments: task.attachments ?? [],
       time: task.time ?? '00:00:00',
@@ -75,7 +85,6 @@ export const useAppStore = defineStore('app', () => {
       labelClass: task.labelClass ?? null,
       description: task.description ?? '',
       status: task.status ?? 'To Do',
-      completed: task.completed ?? false,
       column_id: task.column_id ?? columnId ?? null,
     }
   }
@@ -173,17 +182,27 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function toggleSubtask(subtaskId: string, taskId: string, completed: boolean) {
-    if (completed) {
-      await apiCompleteSubtask(subtaskId)
-    } else {
-      await apiUpdateSubtask(subtaskId, { title: undefined })
-    }
+    await apiCompleteSubtask(subtaskId, completed)
     for (const boardId in columnsByBoard.value) {
       for (const col of columnsByBoard.value[boardId]) {
         const task = col.tasks.find((t: any) => t.id === taskId)
         if (task) {
           const sub = task.subtasks?.find((s: any) => s.id === subtaskId)
           if (sub) sub.completed = completed
+          break
+        }
+      }
+    }
+  }
+
+  async function renameSubtask(subtaskId: string, taskId: string, title: string) {
+    await apiUpdateSubtask(subtaskId, { title })
+    for (const boardId in columnsByBoard.value) {
+      for (const col of columnsByBoard.value[boardId]) {
+        const task = col.tasks.find((t: any) => t.id === taskId)
+        if (task) {
+          const sub = task.subtasks?.find((s: any) => s.id === subtaskId)
+          if (sub) sub.title = title
           break
         }
       }
@@ -205,8 +224,9 @@ export const useAppStore = defineStore('app', () => {
 
   return {
     boards, boardsLoaded, fetchBoards, addBoard,
+    users, usersLoaded, fetchUsers,
     columnsByBoard, fetchColumns, addColumn,
-    fetchTasks, addTask, editTask, removeTask, moveTaskToColumn, addSubtask, toggleSubtask, removeSubtask,
+    fetchTasks, addTask, editTask, removeTask, moveTaskToColumn, addSubtask, toggleSubtask, renameSubtask, removeSubtask,
   }
 }, {
   persist: {

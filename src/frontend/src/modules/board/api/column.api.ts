@@ -26,7 +26,7 @@ export async function deleteColumn(columnId: string) {
     await http.delete(`/columns/${columnId}`)
 }
 
-export async function reorderColumn(columnId: string, newOrder: number) {
-    const res = await http.patch(`/columns/${columnId}/reorder`, { order: newOrder })
+export async function reorderColumn(columnId: string, newPosition: number) {
+    const res = await http.patch(`/columns/${columnId}/reorder`, null, { params: { new_position: newPosition } })
     return res.data?.data ?? res.data
 }

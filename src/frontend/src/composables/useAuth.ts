@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue'
-import type { User } from '../services/authService'
-import { getCurrentUser, logout as apiLogout } from '../services/authService'
+import type { User } from '../modules/auth/api/auth.api'
+import { getCurrentUser, logout as apiLogout } from '../modules/auth/api/auth.api'
 
 // State global (singleton pattern tanpa Pinia)
 const user = ref<User | null>(null)

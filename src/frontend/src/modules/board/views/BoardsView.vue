@@ -3,20 +3,22 @@
     <div class="flex gap-3 overflow-x-auto pb-4 px-1">
 
       <!-- Column loop -->
-      <div v-for="(board, index) in boards" :key="index"
-        class="min-w-[260px] max-w-[260px] flex flex-col rounded-xl border border-gray-200 bg-gray-50"
-        style="max-height: calc(100vh - 120px)">
+      <VueDraggable v-model="columnsByBoard[boardId]" :animation="150" ghost-class="opacity-40"
+        chosen-class="shadow-lg" handle=".column-drag-handle" class="flex gap-3" @end="onColumnDragEnd">
+        <div v-for="board in columnsByBoard[boardId]" :key="board.id"
+          class="min-w-[260px] max-w-[260px] flex flex-col rounded-xl border border-gray-200 bg-gray-50"
+          style="max-height: calc(100vh - 120px)">
 
-        <!-- Column Header -->
-        <div class="flex items-center justify-between px-3 py-2.5 border-b border-gray-200">
-          <div class="flex items-center gap-2">
-            <span class="text-sm font-medium text-gray-700">{{ board.title }}</span>
-            <span class="text-xs text-gray-400 bg-white border border-gray-200 rounded-full px-2 py-0.5 leading-none">
-              {{ board.tasks?.length ?? 0 }}
-            </span>
+          <!-- Column Header -->
+          <div class="column-drag-handle flex items-center justify-between px-3 py-2.5 border-b border-gray-200 cursor-grab active:cursor-grabbing">
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-medium text-gray-700">{{ board.title }}</span>
+              <span class="text-xs text-gray-400 bg-white border border-gray-200 rounded-full px-2 py-0.5 leading-none">
+                {{ board.tasks?.length ?? 0 }}
+              </span>
+            </div>
+            <span class="text-gray-400 text-base cursor-pointer hover:text-gray-600 leading-none select-none">···</span>
           </div>
-          <span class="text-gray-400 text-base cursor-pointer hover:text-gray-600 leading-none select-none">···</span>
-        </div>
 
         <!-- Task Cards -->
         <!-- Task Cards -->
@@ -26,7 +28,7 @@
           <VueDraggable v-model="board.tasks" group="tasks" :data-column-id="board.id" :animation="150"
             ghost-class="opacity-40" chosen-class="shadow-lg" class="flex flex-col gap-2 min-h-[40px]"
             @end="onTaskDragEnd">
-            <div v-for="task in board.tasks" :key="task.id" :data-id="task.id"
+            <div v-for="task in (board.tasks as Task[])" :key="task.id" :data-id="task.id"
               class="bg-white rounded-lg border border-gray-200 p-3 cursor-grab active:cursor-grabbing hover:border-blue-400 hover:shadow-md transition-all group"
               @click="openModal(task)">
 
@@ -46,9 +48,9 @@
                   </svg>
                   {{ task.dueDate }}
                 </span>
-                <span v-if="task.checklist?.length > 0" class="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded"
-                  :class="task.checklist.filter((c: { done: boolean }) => c.done).length === task.checklist.length ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'">
-                  ✓ {{task.checklist.filter((c: { done: boolean }) => c.done).length}}/{{ task.checklist.length }}
+                <span v-if="task.subtasks?.length" class="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded"
+                  :class="task.subtasks.filter(s => s.completed).length === task.subtasks.length ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'">
+                  ✓ {{ task.subtasks.filter(s => s.completed).length }}/{{ task.subtasks.length }}
                 </span>
                 <span v-if="task.attachments?.length"
                   class="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-gray-100 text-gray-500">
@@ -69,9 +71,9 @@
                   </button>
                 </div>
                 <div class="flex">
-                  <div v-for="(m, mi) in (task.members ?? []).slice(0, 3)" :key="mi"
+                  <div v-for="(m, mi) in resolveMembers(task.assignee_ids).slice(0, 3)" :key="mi"
                     class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white border-2 border-white"
-                    :class="m.color || 'bg-blue-400'" :style="(mi as number) > 0 ? 'margin-left: -6px' : ''"
+                    :class="m.color" :style="(mi as number) > 0 ? 'margin-left: -6px' : ''"
                     :title="m.name">{{ m.initial }}</div>
                 </div>
               </div>
@@ -100,7 +102,8 @@
           </button>
         </div>
 
-      </div> <!-- tutup v-for -->
+        </div> <!-- tutup v-for -->
+      </VueDraggable>
 
       <!-- Add Column -->
       <div class="min-w-[240px] flex-shrink-0 pt-0.5">
@@ -210,14 +213,6 @@
           <!-- LEFT -->
           <div class="flex-1 overflow-y-auto px-6 py-5">
             <div class="flex items-start gap-3 mb-5">
-              <button @click.stop="selectedTask.completed = !selectedTask.completed"
-                class="mt-0.5 w-5 h-5 rounded-full border-2 flex-shrink-0 transition"
-                :class="selectedTask.completed ? 'bg-blue-600 border-blue-600' : 'border-gray-400'">
-                <svg v-if="selectedTask.completed" class="w-full h-full text-white p-0.5" fill="none"
-                  stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
-                </svg>
-              </button>
               <h2 contenteditable="true"
                 @blur="(e: FocusEvent) => { if (selectedTask && e.target) selectedTask.title = (e.target as HTMLElement).innerText }"
                 class="text-xl font-bold text-gray-900 outline-none border-b-2 border-transparent focus:border-blue-400 flex-1 leading-tight">
@@ -250,9 +245,9 @@
                   </div>
                 </div>
               </div>
-              <button @click.stop="closeAllDropdowns(); showAddChecklist = !showAddChecklist"
+              <button @click.stop="closeAllDropdowns(); addingSubtask = !addingSubtask"
                 class="flex items-center gap-1.5 text-xs border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 text-gray-600 transition">
-                <font-awesome-icon icon="check-square" /> Checklist
+                <font-awesome-icon icon="check-square" /> Subtask
               </button>
               <button @click.stop="showAttachPanel = !showAttachPanel"
                 class="flex items-center gap-1.5 text-xs border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 text-gray-600 transition"
@@ -261,60 +256,24 @@
               </button>
             </div>
 
-            <div class="flex gap-8 mb-6">
-              <div>
-                <p class="text-xs text-gray-500 font-medium mb-2">Members</p>
-                <div class="flex items-center gap-1.5">
-                  <div v-for="(m, i) in selectedTask.members" :key="i"
-                    class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                    :class="m.color" :title="m.name">{{ m.initial }}</div>
-                  <button
-                    class="w-8 h-8 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 hover:border-blue-400 text-sm">+</button>
-                </div>
-              </div>
-              <div>
-                <p class="text-xs text-gray-500 font-medium mb-2">Due date</p>
-                <button
-                  class="flex items-center gap-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition">
-                  {{ selectedTask.dueDate }}
-                  <svg class="w-3 h-3" viewBox="0 0 10 6" fill="currentColor">
-                    <path d="M0 0l5 6 5-6z" />
-                  </svg>
-                </button>
-              </div>
+            <div class="mb-6">
+              <p class="text-xs text-gray-500 font-medium mb-2">Due date</p>
+              <button
+                class="flex items-center gap-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition">
+                {{ selectedTask.dueDate }}
+                <svg class="w-3 h-3" viewBox="0 0 10 6" fill="currentColor">
+                  <path d="M0 0l5 6 5-6z" />
+                </svg>
+              </button>
             </div>
 
-            <div v-if="(selectedTask.attachments?.length ?? 0) > 0" class="mb-6">
+            <div class="mb-6">
               <div class="flex items-center gap-2 mb-2">
-                <font-awesome-icon icon="paperclip" class="text-gray-400 text-xs" />
-                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Attachments</p>
+                <font-awesome-icon icon="align-left" class="text-gray-500 text-sm" />
+                <p class="text-sm font-semibold text-gray-700">Description</p>
               </div>
-              <div class="space-y-2">
-                <div v-for="(att, i) in selectedTask.attachments" :key="i"
-                  class="flex items-center justify-between gap-2 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 group hover:border-gray-300 transition">
-                  <div class="flex items-center gap-3 min-w-0">
-                    <img v-if="att.url && att.type === 'image'" :src="att.url"
-                      class="w-12 h-12 rounded object-cover flex-shrink-0 border border-gray-200" />
-                    <div v-else
-                      class="w-12 h-12 rounded bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
-                      <font-awesome-icon icon="paperclip" class="text-gray-400" />
-                    </div>
-                    <div class="min-w-0">
-                      <a v-if="att.url" :href="att.url" target="_blank"
-                        class="text-xs font-medium text-blue-600 hover:underline block truncate max-w-[200px]">{{
-                          att.title ??
-                          att.url }}</a>
-                      <p v-else class="text-xs font-medium text-gray-700 truncate">{{ att.title ?? '-' }}</p>
-                      <p class="text-xs text-gray-400 mt-0.5">{{ att.type === 'image' ? 'Image' : att.type === 'link' ?
-                        'Link' :
-                        'File' }}</p>
-                    </div>
-                  </div>
-                  <button @click="handleDeleteAttachment(att.id, i)"
-                    class="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition text-xs flex-shrink-0 px-1"
-                    title="Delete">✕</button>
-                </div>
-              </div>
+              <textarea v-model="selectedTask.description" placeholder="Add a more detailed description..." rows="3"
+                class="w-full text-sm text-gray-600 border border-gray-200 rounded-lg px-3 py-2.5 outline-none focus:border-blue-400 resize-none transition placeholder-gray-400"></textarea>
             </div>
 
             <div class="mb-6 p-3 bg-gray-50 border border-gray-200 rounded-xl">
@@ -377,14 +336,7 @@
               </div>
             </div>
 
-            <div class="mb-6">
-              <div class="flex items-center gap-2 mb-2">
-                <font-awesome-icon icon="align-left" class="text-gray-500 text-sm" />
-                <p class="text-sm font-semibold text-gray-700">Description</p>
-              </div>
-              <textarea v-model="selectedTask.description" placeholder="Add a more detailed description..." rows="3"
-                class="w-full text-sm text-gray-600 border border-gray-200 rounded-lg px-3 py-2.5 outline-none focus:border-blue-400 resize-none transition placeholder-gray-400"></textarea>
-            </div><!-- Subtasks -->
+            <!-- Subtasks -->
             <div class="mb-6">
               <div class="flex items-center justify-between mb-3">
                 <div class="flex items-center gap-2">
@@ -416,7 +368,10 @@
                   class="flex items-center gap-2 group px-2 py-1.5 rounded-lg hover:bg-gray-50 transition">
                   <input type="checkbox" :checked="sub.completed" @change="handleToggleSubtask(sub.id, !sub.completed)"
                     class="w-4 h-4 rounded accent-blue-600 cursor-pointer flex-shrink-0" />
-                  <span class="text-sm flex-1" :class="sub.completed ? 'line-through text-gray-400' : 'text-gray-700'">
+                  <span contenteditable="true"
+                    @blur="(e: FocusEvent) => handleRenameSubtask(sub.id, sub.title, (e.target as HTMLElement).innerText)"
+                    class="text-sm flex-1 outline-none border-b border-transparent focus:border-blue-400 transition"
+                    :class="sub.completed ? 'line-through text-gray-400' : 'text-gray-700'">
                     {{ sub.title }}
                   </span>
                   <button @click="handleDeleteSubtask(sub.id)"
@@ -438,47 +393,67 @@
               </div>
             </div>
 
-
-            <div v-if="selectedTask.checklist?.length > 0 || showAddChecklist" class="mb-6">
-              <div class="flex items-center justify-between mb-2">
-                <div class="flex items-center gap-2">
-                  <font-awesome-icon icon="check-square" class="text-gray-500 text-sm" />
-                  <input v-model="selectedTask.checklistTitle" placeholder="Checklist title..."
-                    class="text-sm font-semibold text-gray-700 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-400 outline-none transition w-40" />
-                </div>
-                <div class="flex gap-2">
-                  <button @click="hideChecked = !hideChecked"
-                    class="text-xs text-gray-500 border border-gray-200 rounded-lg px-3 py-1 hover:bg-gray-50 transition">
-                    {{ hideChecked ? 'Show checked' : 'Hide checked' }}
-                  </button>
-                  <button @click="selectedTask.checklist = []"
-                    class="text-xs text-gray-500 border border-gray-200 rounded-lg px-3 py-1 hover:bg-gray-50 transition">Delete</button>
-                </div>
-              </div>
-              <div class="flex items-center gap-2 mb-3">
-                <span class="text-xs text-gray-500 w-8">{{ checklistProgress }}%</span>
-                <div class="flex-1 bg-gray-200 rounded-full h-1.5">
-                  <div class="bg-blue-500 h-1.5 rounded-full transition-all"
-                    :style="{ width: checklistProgress + '%' }"></div>
-                </div>
+            <!-- Attachments -->
+            <div v-if="(selectedTask.attachments?.length ?? 0) > 0" class="mb-6">
+              <div class="flex items-center gap-2 mb-2">
+                <font-awesome-icon icon="paperclip" class="text-gray-400 text-xs" />
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Attachments</p>
               </div>
               <div class="space-y-2">
-                <div v-for="(item, i) in visibleChecklist" :key="i" class="flex items-center gap-3">
-                  <input type="checkbox" v-model="item.done"
-                    @change="logActivity(`completed ${item.label} on this card`)"
-                    class="w-4 h-4 rounded accent-blue-600 cursor-pointer flex-shrink-0" />
-                  <span class="text-sm" :class="item.done ? 'line-through text-gray-400' : 'text-gray-700'">{{
-                    item.label
-                  }}</span>
+                <div v-for="(att, i) in selectedTask.attachments" :key="i"
+                  class="flex items-center justify-between gap-2 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 group hover:border-gray-300 transition">
+                  <div class="flex items-center gap-3 min-w-0">
+                    <img v-if="att.url && att.type === 'image'" :src="att.url"
+                      class="w-12 h-12 rounded object-cover flex-shrink-0 border border-gray-200" />
+                    <div v-else
+                      class="w-12 h-12 rounded bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
+                      <font-awesome-icon icon="paperclip" class="text-gray-400" />
+                    </div>
+                    <div class="min-w-0">
+                      <a v-if="att.url" :href="att.url" target="_blank"
+                        class="text-xs font-medium text-blue-600 hover:underline block truncate max-w-[200px]">{{
+                          att.title ??
+                          att.url }}</a>
+                      <p v-else class="text-xs font-medium text-gray-700 truncate">{{ att.title ?? '-' }}</p>
+                      <p class="text-xs text-gray-400 mt-0.5">{{ att.type === 'image' ? 'Image' : att.type === 'link' ?
+                        'Link' :
+                        'File' }}</p>
+                    </div>
+                  </div>
+                  <button @click="handleDeleteAttachment(att.id, i)"
+                    class="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition text-xs flex-shrink-0 px-1"
+                    title="Delete">✕</button>
                 </div>
               </div>
-              <div v-if="showAddChecklist" class="mt-3 flex gap-2">
-                <input v-model="newCheckItem" @keyup.enter="addCheckItem" placeholder="Add an item..."
-                  class="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-blue-400 transition" />
-                <button @click="addCheckItem"
-                  class="bg-blue-500 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-blue-600 transition">Add</button>
-                <button @click="showAddChecklist = false; newCheckItem = ''"
-                  class="text-xs text-gray-500 px-2 hover:text-gray-700">✕</button>
+            </div>
+
+            <!-- Members -->
+            <div class="mb-6">
+              <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Members</p>
+              <div class="flex items-center gap-2 flex-wrap">
+                <div v-for="m in assignedMembers" :key="m.id" class="relative group/member">
+                  <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                    :class="m.color" :title="m.name">{{ m.initial }}</div>
+                  <button @click.stop="handleToggleMember(m.id)"
+                    class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-white border border-gray-300 text-gray-400 hover:text-red-500 hover:border-red-300 opacity-0 group-hover/member:opacity-100 transition text-[9px] flex items-center justify-center leading-none"
+                    title="Remove">✕</button>
+                </div>
+                <div class="relative">
+                  <button @click.stop="closeAllDropdowns(); memberMenuOpen = !memberMenuOpen"
+                    class="w-8 h-8 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 hover:border-blue-400 text-sm">+</button>
+                  <div v-if="memberMenuOpen"
+                    class="absolute left-0 top-9 bg-white border border-gray-200 rounded-xl shadow-xl z-20 w-56 py-1 max-h-64 overflow-y-auto">
+                    <button v-for="u in users" :key="u.id" @click.stop="handleToggleMember(u.id)"
+                      class="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-gray-50 transition text-left">
+                      <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
+                        :class="memberColor(u.id)">{{ (u.full_name || u.email || '?').charAt(0).toUpperCase() }}</div>
+                      <span class="flex-1 truncate text-gray-700">{{ u.full_name || u.email }}</span>
+                      <font-awesome-icon v-if="(selectedTask?.assignee_ids ?? []).includes(u.id)" icon="check"
+                        class="text-blue-500 text-xs" />
+                    </button>
+                    <p v-if="!users.length" class="px-3 py-2 text-xs text-gray-400">Tidak ada user.</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -579,9 +554,9 @@
 </template>
 
 <script setup lang="ts">
-import draggable from 'vuedraggable'
 import { VueDraggable } from 'vue-draggable-plus'
 import { moveTask as apiMoveTask } from '../api/task.api'
+import { reorderColumn as apiReorderColumn } from '../api/column.api'
 import { useRoute, useRouter } from 'vue-router'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import Layout from '../../../components/common/AppLayout.vue'
@@ -589,7 +564,7 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import {
   faClock, faPlay, faStop, faPlus, faTag, faCheckSquare, faPaperclip,
-  faAlignLeft, faEye, faImage, faEllipsisH, faTimes, faCommentAlt,
+  faAlignLeft, faEye, faImage, faEllipsisH, faTimes, faCommentAlt, faCheck,
 } from '@fortawesome/free-solid-svg-icons'
 import {
   addComment as apiAddComment,
@@ -639,27 +614,24 @@ interface Task {
   title: string
   description?: string
   status?: string
-  completed?: boolean
-  checklist: { label: string; done: boolean }[]
   subtasks?: Subtask[]
-  members: { name: string; initial: string; color: string }[]
+  assignee_ids?: string[]
   activity: ActivityItem[]
   attachments?: { id: string | null; title: string; type: string; url: string | null }[]
   time?: string
   dueDate?: string
   label?: string
   labelClass?: string
-  checklistTitle?: string
   _watching?: boolean
 }
 
-library.add(faClock, faPlay, faStop, faPlus, faTag, faCheckSquare, faPaperclip, faAlignLeft, faEye, faImage, faEllipsisH, faTimes, faCommentAlt)
+library.add(faClock, faPlay, faStop, faPlus, faTag, faCheckSquare, faPaperclip, faAlignLeft, faEye, faImage, faEllipsisH, faTimes, faCommentAlt, faCheck)
 
 const route = useRoute()
 const router = useRouter()
 const boardId = route.params.boardId as string
 const store = useAppStore()
-const { columnsByBoard } = storeToRefs(store)
+const { columnsByBoard, users } = storeToRefs(store)
 const boards = computed(() => columnsByBoard.value[boardId] ?? [])
 const moveOpen = ref(false)
 
@@ -673,8 +645,7 @@ const selectedTask = ref<Task | null>(null)
 const statusOpen = ref(false)
 const ellipsisOpen = ref(false)
 const addMenuOpen = ref(false)
-const showAddChecklist = ref(false)
-const newCheckItem = ref('')
+const memberMenuOpen = ref(false)
 const newComment = ref('')
 const commentLoading = ref(false)
 const showAttachPanel = ref(false)
@@ -683,7 +654,6 @@ const attachLinkTitle = ref('')
 const attachLinkUrl = ref('')
 const attachLinkLoading = ref(false)
 const attachFileLoading = ref(false)
-const hideChecked = ref(false)
 const showActivity = ref(true)
 const toast = ref('')
 const showNewBoard = ref(false)
@@ -705,8 +675,31 @@ const timerDescription = ref('')
 let tickInterval: ReturnType<typeof setInterval> | null = null
 let pingInterval: ReturnType<typeof setInterval> | null = null
 let toastTimer: ReturnType<typeof setTimeout> | null = null
+let originalTaskSnapshot: { title: string; description: string } | null = null
 
 // ─── Helpers ──────────────────────────────────────────────────
+const memberPalette = ['bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-pink-500', 'bg-purple-500', 'bg-cyan-600', 'bg-rose-500', 'bg-indigo-500']
+
+function memberColor(id: string): string {
+  let hash = 0
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0
+  return memberPalette[hash % memberPalette.length]
+}
+
+function resolveMembers(ids?: string[]) {
+  if (!ids?.length) return []
+  return ids
+    .map(id => users.value.find((u: any) => u.id === id))
+    .filter((u: any): u is any => !!u)
+    .map((u: any) => ({
+      id: u.id as string,
+      name: (u.full_name ?? u.email ?? 'Unknown') as string,
+      initial: ((u.full_name ?? u.email ?? '?') as string).charAt(0).toUpperCase(),
+      color: memberColor(u.id),
+    }))
+}
+
+const assignedMembers = computed(() => resolveMembers(selectedTask.value?.assignee_ids))
 function findTaskById(id: string): Task | null {
   for (const board of boards.value) {
     const t = (board.tasks ?? []).find((t: Task) => t.id === id)
@@ -763,13 +756,28 @@ async function onTaskDragEnd(event: any) {
     // JANGAN fetch ulang — biarkan vue-draggable handle UI
   }
 }
+
+async function onColumnDragEnd(event: any) {
+  const columnId = columnsByBoard.value[boardId]?.[event.newIndex]?.id
+  if (!columnId) return
+
+  try {
+    await apiReorderColumn(columnId, event.newIndex + 1)
+  } catch (e: any) {
+    showToast(e?.response?.data?.error?.message || 'Gagal mengubah urutan column.')
+    // JANGAN fetch ulang — biarkan vue-draggable handle UI
+  }
+}
+
 async function handleAddSubtask() {
   if (!newSubtaskTitle.value.trim() || !selectedTask.value) return
+  const title = newSubtaskTitle.value.trim()
   subtaskCreating.value = true
   try {
-    await store.addSubtask(selectedTask.value.id, newSubtaskTitle.value.trim())
+    await store.addSubtask(selectedTask.value.id, title)
     newSubtaskTitle.value = ''
     addingSubtask.value = false
+    logActivity(`menambahkan checklist "${title}"`)
     showToast('Subtask added.')
   } catch (e: any) {
     showToast(e?.response?.data?.error?.message || 'Gagal menambah subtask.')
@@ -780,10 +788,33 @@ async function handleAddSubtask() {
 
 async function handleToggleSubtask(subtaskId: string, completed: boolean) {
   if (!selectedTask.value) return
+  const sub = selectedTask.value.subtasks?.find(s => s.id === subtaskId)
   try {
     await store.toggleSubtask(subtaskId, selectedTask.value.id, completed)
+    if (sub) {
+      logActivity(completed
+        ? `menyelesaikan checklist "${sub.title}"`
+        : `membuka kembali checklist "${sub.title}"`)
+    }
   } catch (e: any) {
     showToast(e?.response?.data?.error?.message || 'Gagal update subtask.')
+  }
+}
+
+async function handleRenameSubtask(subtaskId: string, oldTitle: string, newTitle: string) {
+  if (!selectedTask.value) return
+  const trimmed = newTitle.trim()
+  if (!trimmed || trimmed === oldTitle) {
+    const sub = selectedTask.value.subtasks?.find(s => s.id === subtaskId)
+    if (sub) sub.title = oldTitle
+    return
+  }
+  try {
+    await store.renameSubtask(subtaskId, selectedTask.value.id, trimmed)
+  } catch (e: any) {
+    const sub = selectedTask.value.subtasks?.find(s => s.id === subtaskId)
+    if (sub) sub.title = oldTitle
+    showToast(e?.response?.data?.error?.message || 'Gagal mengubah nama subtask.')
   }
 }
 
@@ -814,7 +845,6 @@ async function handleTimerToggle(task: Task) {
       timerDescription.value = ''
       startTick(task.id)
       startPing(task.id)
-      logActivity('started timer on this card')
       showToast('Timer started ▶')
     } catch (e: any) {
       showToast(e?.response?.data?.error?.message || 'Gagal memulai timer.')
@@ -831,8 +861,6 @@ async function doStopTimer(taskId: string) {
     activeTimerTaskId.value = null
     localStorage.removeItem('active_timer_task_id')
     localStorage.removeItem('active_timer_task_title')
-    const task = findTaskById(taskId)
-    if (task) logActivityOn(task, `stopped timer — ${formatTimer(elapsed)}`)
     showToast(`Timer stopped ⏹ — ${formatTimer(elapsed)}`)
 
     // Log baru baru tercatat di backend setelah stop — tarik ulang biar langsung tampil.
@@ -910,7 +938,7 @@ async function handleCreateBoard() {
   }
 }
 
-onMounted(initBoards)
+onMounted(() => { initBoards(); store.fetchUsers() })
 onUnmounted(() => { stopTick(); stopPing() })
 // ─── Task Actions ─────────────────────────────────────
 async function handleDeleteTask() {
@@ -927,12 +955,20 @@ async function handleDeleteTask() {
 
 async function handleSaveTask() {
   if (!selectedTask.value) return
+  const prev = originalTaskSnapshot
+  const nextTitle = selectedTask.value.title
+  const nextDescription = selectedTask.value.description ?? ''
   try {
     await store.editTask(selectedTask.value.id, {
-      title: selectedTask.value.title,
-      description: selectedTask.value.description,
+      title: nextTitle,
+      description: nextDescription,
       status: selectedTask.value.status,
     })
+    if (prev) {
+      if (prev.title !== nextTitle) logActivity(`mengubah judul card menjadi "${nextTitle}"`)
+      if (prev.description !== nextDescription) logActivity('mengubah deskripsi card')
+    }
+    originalTaskSnapshot = { title: nextTitle, description: nextDescription }
     showToast('Task saved.')
   } catch (e: any) {
     showToast(e?.response?.data?.error?.message || 'Gagal menyimpan task.')
@@ -946,14 +982,36 @@ const allColumns = computed(() => {
 
 async function handleMoveTask(toColumnId: string) {
   if (!selectedTask.value) return
-  const fromColumnId = selectedTask.value.column_id
+  const task = selectedTask.value
+  const fromColumnId = task.column_id
   if (fromColumnId === toColumnId) return
+  const toColumn = allColumns.value.find((c: any) => c.id === toColumnId)
   try {
-    await store.moveTaskToColumn(selectedTask.value.id, fromColumnId, toColumnId)
+    await store.moveTaskToColumn(task.id, fromColumnId, toColumnId)
+    if (toColumn) logActivityOn(task, `memindahkan card ke "${toColumn.title}"`)
     closeModal()
     showToast('Task moved.')
   } catch (e: any) {
     showToast(e?.response?.data?.error?.message || 'Gagal memindahkan task.')
+  }
+}
+
+async function handleToggleMember(userId: string) {
+  if (!selectedTask.value) return
+  const current = selectedTask.value.assignee_ids ?? []
+  const isAssigned = current.includes(userId)
+  const next = isAssigned ? current.filter(id => id !== userId) : [...current, userId]
+  const user = users.value.find((u: any) => u.id === userId)
+  try {
+    await store.editTask(selectedTask.value.id, { assignee_ids: next })
+    selectedTask.value.assignee_ids = next
+    if (user) {
+      logActivity(isAssigned
+        ? `menghapus ${user.full_name} dari card ini`
+        : `menambahkan ${user.full_name} ke card ini`)
+    }
+  } catch (e: any) {
+    showToast(e?.response?.data?.error?.message || 'Gagal mengubah member.')
   }
 }
 
@@ -963,6 +1021,7 @@ function closeAllDropdowns() {
   ellipsisOpen.value = false
   addMenuOpen.value = false
   moveOpen.value = false
+  memberMenuOpen.value = false
 }
 
 const ellipsisMenuItems = [
@@ -995,39 +1054,27 @@ function toggleWatch() {
 const addMenuItems = [
   { label: 'Labels', action: 'labels', desc: 'Organize, categorize, and prioritize' },
   { label: 'Dates', action: 'dates', desc: 'Start date, due date, reminder' },
-  { label: 'Checklist', action: 'checklist', desc: 'Add subtask' },
+  { label: 'Subtask', action: 'checklist', desc: 'Add subtask' },
   { label: 'Members', action: 'members', desc: 'Assign members' },
   { label: 'Attachments', action: 'attachments', desc: 'Add links, pages, work items, etc' },
 ]
 
 function handleAddAction(action: string) {
   addMenuOpen.value = false
-  if (action === 'checklist') { showAddChecklist.value = true; return }
+  if (action === 'checklist') { addingSubtask.value = true; return }
+  if (action === 'members') { memberMenuOpen.value = true; return }
   showToast(`${action} — coming soon.`)
 }
 
 const statuses = ['To Do', 'Doing', 'In Review', 'Done']
 
-// ─── Computed ─────────────────────────────────────────────────
-const checklistProgress = computed(() => {
-  if (!selectedTask.value || !selectedTask.value.checklist.length) return 0
-  const done = selectedTask.value.checklist.filter((c: { done: boolean }) => c.done).length
-  return Math.round((done / selectedTask.value.checklist.length) * 100)
-})
-
-const visibleChecklist = computed(() => {
-  if (!selectedTask.value) return []
-  return hideChecked.value
-    ? selectedTask.value.checklist.filter((c: { done: boolean }) => !c.done)
-    : selectedTask.value.checklist
-})
-
 // ─── Modal ────────────────────────────────────────────────────
 function openModal(task: Task) {
   selectedTask.value = task
   closeAllDropdowns()
-  showAddChecklist.value = false
+  addingSubtask.value = false
   showAttachPanel.value = false
+  originalTaskSnapshot = { title: task.title, description: task.description ?? '' }
 
   timerLogs.value = []
   timerLogsError.value = ''
@@ -1037,17 +1084,11 @@ function openModal(task: Task) {
 
 function closeModal() {
   selectedTask.value = null
+  originalTaskSnapshot = null
   timerLogs.value = []
   timerLogsError.value = ''
   timerDescription.value = ''
   closeAllDropdowns()
-}
-
-function addCheckItem() {
-  if (!newCheckItem.value.trim() || !selectedTask.value) return
-  selectedTask.value.checklist.push({ label: newCheckItem.value.trim(), done: false })
-  logActivity(`added "${newCheckItem.value.trim()}" to this card`)
-  newCheckItem.value = ''
 }
 
 // ─── Comments ─────────────────────────────────────────────────
