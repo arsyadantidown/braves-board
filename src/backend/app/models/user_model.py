@@ -1,7 +1,7 @@
 import uuid
 from sqlalchemy import String, Text, DateTime, func
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.connections.postgres import Base
 
 class User(Base):
@@ -15,3 +15,5 @@ class User(Base):
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     deleted_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), index=True, nullable=True)
+
+    board_members = relationship("BoardMember", back_populates="user")
