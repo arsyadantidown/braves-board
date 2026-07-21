@@ -132,6 +132,7 @@ const rawLogs      = ref<any[]>([])
 
 const activeTaskId    = ref<string | null>(localStorage.getItem('active_timer_task_id'))
 const activeTaskTitle = ref<string | null>(localStorage.getItem('active_timer_task_title'))
+const activeBoardId   = ref<string | null>(localStorage.getItem('active_timer_board_id'))
 const isRunning       = ref(!!activeTaskId.value)
 const elapsed         = ref(0)
 
@@ -148,7 +149,8 @@ function stopTick() {
 function startPing(taskId: string) {
   stopPing()
   pingInterval = setInterval(async () => {
-    try { await pingTimerApi(taskId) } catch {}
+    if (!activeBoardId.value) return
+    try { await pingTimerApi(taskId, activeBoardId.value) } catch {}
   }, 120000)
 }
 function stopPing() {
@@ -165,9 +167,13 @@ function formatSec(s: number): string {
 async function toggleTimer() {
   if (isRunning.value) {
     if (!activeTaskId.value) return
+    if (!activeBoardId.value) {
+      showToast('Board timer tidak diketahui. Stop dari halaman Boards.')
+      return
+    }
     timerLoading.value = true
     try {
-      await stopTimer(activeTaskId.value)
+      await stopTimer(activeTaskId.value, activeBoardId.value)
       stopTick(); stopPing()
       showToast(`Stopped — ${formatSec(elapsed.value)}`)
       await fetchLogs(activeTaskId.value)
@@ -175,8 +181,10 @@ async function toggleTimer() {
       elapsed.value   = 0
       localStorage.removeItem('active_timer_task_id')
       localStorage.removeItem('active_timer_task_title')
+      localStorage.removeItem('active_timer_board_id')
       activeTaskId.value    = null
       activeTaskTitle.value = null
+      activeBoardId.value   = null
     } catch (e: any) {
       showToast(e?.response?.data?.error?.message || 'Gagal menghentikan timer.')
     } finally {
@@ -192,9 +200,10 @@ function resumeEntry(item: any) {
 }
 
 async function fetchLogs(taskId: string) {
+  if (!activeBoardId.value) { rawLogs.value = []; return }
   logsLoading.value = true
   try {
-    rawLogs.value = await getTimerLogs(taskId)
+    rawLogs.value = await getTimerLogs(taskId, activeBoardId.value)
   } catch {
     rawLogs.value = []
   } finally {

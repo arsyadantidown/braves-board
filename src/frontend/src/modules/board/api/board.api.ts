@@ -40,32 +40,36 @@ export async function getUsers() {
 }
 
 // ─── Comments ─────────────────────────────────────────────────
+// Backend: require_permission() butuh board_id, tapi endpoint /tasks/*
+// tidak mendeklarasikannya di path — FastAPI resolve sebagai query param
+// wajib. Semua call di bawah HARUS menyertakan board_id.
 
-export async function addComment(taskId: string, content: string) {
-  const res = await api.post(`/tasks/${taskId}/comments`, { content })
+export async function addComment(taskId: string, content: string, boardId: string) {
+  const res = await api.post(`/tasks/${taskId}/comments`, { content }, { params: { board_id: boardId } })
   return res.data?.data ?? res.data
 }
 
-export async function deleteComment(commentId: string) {
-  await api.delete(`/tasks/comments/${commentId}`)
+export async function deleteComment(commentId: string, boardId: string) {
+  await api.delete(`/tasks/comments/${commentId}`, { params: { board_id: boardId } })
 }
 
 // ─── Attachments — pakai http (tanpa /api/v1) ─────────────────
 
-export async function uploadAttachmentFile(taskId: string, file: File) {
+export async function uploadAttachmentFile(taskId: string, file: File, boardId: string) {
   const formData = new FormData()
   formData.append('file', file)
   const res = await http.post(`/tasks/${taskId}/attachments/file`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    params: { board_id: boardId },
   })
   return res.data?.data ?? res.data
 }
 
-export async function addAttachmentLink(taskId: string, title: string, url: string) {
-  const res = await http.post(`/tasks/${taskId}/attachments/link`, { title, url })
+export async function addAttachmentLink(taskId: string, title: string, url: string, boardId: string) {
+  const res = await http.post(`/tasks/${taskId}/attachments/link`, { title, url }, { params: { board_id: boardId } })
   return res.data?.data ?? res.data
 }
 
-export async function deleteAttachment(attachId: string) {
-  await http.delete(`/tasks/attachments/${attachId}`)
+export async function deleteAttachment(attachId: string, boardId: string) {
+  await http.delete(`/tasks/attachments/${attachId}`, { params: { board_id: boardId } })
 }

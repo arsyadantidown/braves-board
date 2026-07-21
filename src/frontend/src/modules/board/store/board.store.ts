@@ -10,6 +10,14 @@ import {
   moveTask as apiMoveTask,
 } from '../api/task.api'
 import { createSubtask as apiCreateSubtask, updateSubtask as apiUpdateSubtask, deleteSubtask as apiDeleteSubtask, completeSubtask as apiCompleteSubtask } from '../api/subtask.api'
+import {
+  getBoardMembers as apiGetBoardMembers,
+  addBoardMember as apiAddBoardMember,
+  updateBoardMemberRole as apiUpdateBoardMemberRole,
+  removeBoardMember as apiRemoveBoardMember,
+  type BoardMember,
+  type BoardRole,
+} from '../api/board-member.api'
 
 export const useAppStore = defineStore('app', () => {
   // ─── Boards ───────────────────────────────────────────
@@ -38,6 +46,39 @@ export const useAppStore = defineStore('app', () => {
     const res = await apiGetUsers()
     users.value = Array.isArray(res) ? res : res.items ?? res.data ?? []
     usersLoaded.value = true
+  }
+
+  // ─── Board Members ──────────────────────────────────────
+  const boardMembers = ref<Record<string, BoardMember[]>>({})
+
+  async function fetchBoardMembers(boardId: string, force = false) {
+    if (boardMembers.value[boardId] && !force) return
+    boardMembers.value[boardId] = await apiGetBoardMembers(boardId)
+  }
+
+  async function addBoardMemberToStore(boardId: string, userId: string, role: BoardRole = 'member') {
+    const member = await apiAddBoardMember(boardId, userId, role)
+    if (!boardMembers.value[boardId]) boardMembers.value[boardId] = []
+    boardMembers.value[boardId].push(member)
+    return member
+  }
+
+  async function updateBoardMemberRoleInStore(boardId: string, userId: string, role: BoardRole) {
+    await apiUpdateBoardMemberRole(boardId, userId, role)
+    const m = boardMembers.value[boardId]?.find(m => m.user_id === userId)
+    if (m) m.role = role
+  }
+
+  async function removeBoardMemberFromStore(boardId: string, userId: string) {
+    await apiRemoveBoardMember(boardId, userId)
+    if (boardMembers.value[boardId]) {
+      boardMembers.value[boardId] = boardMembers.value[boardId].filter(m => m.user_id !== userId)
+    }
+  }
+
+  function getMyRole(boardId: string, userId?: string | null): BoardRole | null {
+    if (!userId) return null
+    return boardMembers.value[boardId]?.find(m => m.user_id === userId)?.role ?? null
   }
 
   // ─── Columns ──────────────────────────────────────────
@@ -111,14 +152,37 @@ export const useAppStore = defineStore('app', () => {
     return null
   }
 
+  // Backend: require_permission() butuh board_id via query param (bug pada
+  // endpoint /tasks, /subtasks, /timer — lihat catatan di api/task.api.ts).
+  // columnsByBoard sudah di-key by boardId, jadi resolve dari situ.
+  function findBoardIdForColumn(columnId: string): string | null {
+    for (const boardId in columnsByBoard.value) {
+      if (columnsByBoard.value[boardId].some((c: any) => c.id === columnId)) return boardId
+    }
+    return null
+  }
+
+  function findBoardIdForTask(taskId: string): string | null {
+    for (const boardId in columnsByBoard.value) {
+      for (const col of columnsByBoard.value[boardId]) {
+        if (col.tasks.some((t: any) => t.id === taskId)) return boardId
+      }
+    }
+    return null
+  }
+
   async function fetchTasks(columnId: string) {
-    const tasks = await getTasks(columnId)
+    const boardId = findBoardIdForColumn(columnId)
+    if (!boardId) return
+    const tasks = await getTasks(columnId, boardId)
     const col = findColById(columnId)
     if (col) col.tasks = normalizeTaskList(tasks)
   }
 
   async function addTask(columnId: string, title: string) {
-    const task = await apiCreateTask(columnId, title)
+    const boardId = findBoardIdForColumn(columnId)
+    if (!boardId) throw new Error('Board tidak ditemukan untuk column ini.')
+    const task = await apiCreateTask(columnId, title, boardId)
     const normalized = {
       ...normalizeTask(task),
       column_id: task.column_id ?? columnId,
@@ -129,7 +193,9 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function editTask(taskId: string, payload: object) {
-    await apiUpdateTask(taskId, payload)
+    const boardId = findBoardIdForTask(taskId)
+    if (!boardId) throw new Error('Board tidak ditemukan untuk task ini.')
+    await apiUpdateTask(taskId, payload, boardId)
     const found = findTaskInStore(taskId)
     if (found) {
       found.col.tasks[found.idx] = { ...found.col.tasks[found.idx], ...payload }
@@ -137,18 +203,21 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function removeTask(taskId: string, columnId: string) {
-    await apiDeleteTask(taskId)
+    const boardId = findBoardIdForColumn(columnId)
+    if (!boardId) throw new Error('Board tidak ditemukan untuk task ini.')
+    await apiDeleteTask(taskId, boardId)
     const col = findColById(columnId)
     if (col) col.tasks = col.tasks.filter((t: any) => t.id !== taskId)
   }
 
   async function moveTaskToColumn(taskId: string, fromColumnId: string, toColumnId: string) {
+    const boardId = findBoardIdForColumn(fromColumnId)
+    if (!boardId) throw new Error('Board tidak ditemukan untuk task ini.')
     const toCol = findColById(toColumnId)
-    const position = 0
+    // Backend mewajibkan position >= 1 — taruh di akhir column tujuan.
+    const position = (toCol?.tasks?.length ?? 0) + 1
 
-    console.log('moveTask payload:', { taskId, column_id: toColumnId, position })
-
-    await apiMoveTask(taskId, toColumnId, position)
+    await apiMoveTask(taskId, toColumnId, position, boardId)
 
     const fromCol = findColById(fromColumnId)
     if (fromCol && toCol) {
@@ -162,14 +231,16 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function addSubtask(taskId: string, title: string) {
-    const res = await apiCreateSubtask(taskId, title)
+    const boardId = findBoardIdForTask(taskId)
+    if (!boardId) throw new Error('Board tidak ditemukan untuk task ini.')
+    const res = await apiCreateSubtask(taskId, title, boardId)
     const newSubtask = {
       id: res.id ?? res,
       title,
       completed: false,
     }
-    for (const boardId in columnsByBoard.value) {
-      for (const col of columnsByBoard.value[boardId]) {
+    for (const bId in columnsByBoard.value) {
+      for (const col of columnsByBoard.value[bId]) {
         const task = col.tasks.find((t: any) => t.id === taskId)
         if (task) {
           if (!task.subtasks) task.subtasks = []
@@ -182,9 +253,11 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function toggleSubtask(subtaskId: string, taskId: string, completed: boolean) {
-    await apiCompleteSubtask(subtaskId, completed)
-    for (const boardId in columnsByBoard.value) {
-      for (const col of columnsByBoard.value[boardId]) {
+    const boardId = findBoardIdForTask(taskId)
+    if (!boardId) throw new Error('Board tidak ditemukan untuk task ini.')
+    await apiCompleteSubtask(subtaskId, completed, boardId)
+    for (const bId in columnsByBoard.value) {
+      for (const col of columnsByBoard.value[bId]) {
         const task = col.tasks.find((t: any) => t.id === taskId)
         if (task) {
           const sub = task.subtasks?.find((s: any) => s.id === subtaskId)
@@ -196,9 +269,11 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function renameSubtask(subtaskId: string, taskId: string, title: string) {
-    await apiUpdateSubtask(subtaskId, { title })
-    for (const boardId in columnsByBoard.value) {
-      for (const col of columnsByBoard.value[boardId]) {
+    const boardId = findBoardIdForTask(taskId)
+    if (!boardId) throw new Error('Board tidak ditemukan untuk task ini.')
+    await apiUpdateSubtask(subtaskId, { title }, boardId)
+    for (const bId in columnsByBoard.value) {
+      for (const col of columnsByBoard.value[bId]) {
         const task = col.tasks.find((t: any) => t.id === taskId)
         if (task) {
           const sub = task.subtasks?.find((s: any) => s.id === subtaskId)
@@ -210,9 +285,11 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function removeSubtask(subtaskId: string, taskId: string) {
-    await apiDeleteSubtask(subtaskId)
-    for (const boardId in columnsByBoard.value) {
-      for (const col of columnsByBoard.value[boardId]) {
+    const boardId = findBoardIdForTask(taskId)
+    if (!boardId) throw new Error('Board tidak ditemukan untuk task ini.')
+    await apiDeleteSubtask(subtaskId, boardId)
+    for (const bId in columnsByBoard.value) {
+      for (const col of columnsByBoard.value[bId]) {
         const task = col.tasks.find((t: any) => t.id === taskId)
         if (task) {
           task.subtasks = task.subtasks?.filter((s: any) => s.id !== subtaskId)
@@ -225,7 +302,10 @@ export const useAppStore = defineStore('app', () => {
   return {
     boards, boardsLoaded, fetchBoards, addBoard,
     users, usersLoaded, fetchUsers,
+    boardMembers, fetchBoardMembers,
+    addBoardMemberToStore, updateBoardMemberRoleInStore, removeBoardMemberFromStore, getMyRole,
     columnsByBoard, fetchColumns, addColumn,
+    findBoardIdForColumn, findBoardIdForTask,
     fetchTasks, addTask, editTask, removeTask, moveTaskToColumn, addSubtask, toggleSubtask, renameSubtask, removeSubtask,
   }
 }, {

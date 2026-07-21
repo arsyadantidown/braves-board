@@ -1,6 +1,22 @@
 <template>
   <Layout>
-    <div class="flex gap-3 overflow-x-auto pb-4 px-1">
+    <!-- Board Header -->
+    <div class="flex items-center justify-between mb-4 px-1">
+      <h1 class="text-lg font-bold text-gray-800">{{ currentBoard?.title ?? 'Board' }}</h1>
+      <div class="flex items-center gap-2">
+        <div class="flex items-center -space-x-2">
+          <div v-for="m in resolveMembers(boardMemberUserIds).slice(0, 5)" :key="m.id"
+            class="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white border-2 border-white"
+            :class="m.color" :title="m.name">{{ m.initial }}</div>
+        </div>
+        <button @click="openMembersPanel"
+          class="flex items-center gap-1.5 text-xs border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 text-gray-600 transition">
+          <font-awesome-icon icon="users" /> Members
+        </button>
+      </div>
+    </div>
+
+    <div class="flex gap-3 overflow-x-auto pb-4 px-1" @click="openColumnMenuId = null">
 
       <!-- Column loop -->
       <VueDraggable v-model="columnsByBoard[boardId]" :animation="150" ghost-class="opacity-40"
@@ -10,14 +26,29 @@
           style="max-height: calc(100vh - 120px)">
 
           <!-- Column Header -->
-          <div class="column-drag-handle flex items-center justify-between px-3 py-2.5 border-b border-gray-200 cursor-grab active:cursor-grabbing">
-            <div class="flex items-center gap-2">
-              <span class="text-sm font-medium text-gray-700">{{ board.title }}</span>
-              <span class="text-xs text-gray-400 bg-white border border-gray-200 rounded-full px-2 py-0.5 leading-none">
+          <div class="flex items-center justify-between px-3 py-2.5 border-b border-gray-200">
+            <div class="column-drag-handle flex items-center gap-2 flex-1 min-w-0 cursor-grab active:cursor-grabbing">
+              <input v-if="renamingColumnId === board.id" v-model="renameColumnTitle"
+                @click.stop @keyup.enter="handleRenameColumnSubmit(board)" @keyup.esc="renamingColumnId = null"
+                @blur="handleRenameColumnSubmit(board)" autofocus
+                class="text-sm font-medium text-gray-700 bg-white border border-blue-300 rounded px-1.5 py-0.5 outline-none min-w-0 flex-1" />
+              <span v-else class="text-sm font-medium text-gray-700 truncate">{{ board.title }}</span>
+              <span class="text-xs text-gray-400 bg-white border border-gray-200 rounded-full px-2 py-0.5 leading-none flex-shrink-0">
                 {{ board.tasks?.length ?? 0 }}
               </span>
             </div>
-            <span class="text-gray-400 text-base cursor-pointer hover:text-gray-600 leading-none select-none">···</span>
+            <div class="relative flex-shrink-0">
+              <button @click.stop="toggleColumnMenu(board.id)"
+                class="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded px-1.5 py-0.5 transition text-base leading-none select-none">···</button>
+              <div v-if="openColumnMenuId === board.id"
+                class="absolute right-0 top-7 bg-white border border-gray-200 rounded-xl shadow-xl z-30 w-44 py-1 overflow-hidden">
+                <button v-if="canRenameColumn" @click.stop="startRenameColumn(board)"
+                  class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">Rename</button>
+                <button v-if="canDeleteColumn" @click.stop="handleDeleteColumn(board)"
+                  class="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-50 transition">Delete</button>
+                <p v-if="!canRenameColumn && !canDeleteColumn" class="px-4 py-2 text-xs text-gray-400">Tidak ada aksi tersedia.</p>
+              </div>
+            </div>
           </div>
 
         <!-- Task Cards -->
@@ -41,12 +72,13 @@
 
               <div class="flex flex-wrap gap-1.5 mb-2">
                 <span v-if="task.dueDate && task.dueDate !== '-'"
-                  class="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-gray-100 text-gray-500">
+                  class="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded"
+                  :class="dueDateBadgeClass(dueDateStatus(task.dueDate))">
                   <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  {{ task.dueDate }}
+                  {{ formatLogDate(task.dueDate) }}
                 </span>
                 <span v-if="task.subtasks?.length" class="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded"
                   :class="task.subtasks.filter(s => s.completed).length === task.subtasks.length ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'">
@@ -82,7 +114,7 @@
         </div>
 
         <!-- Add Card button -->
-        <div class="mx-2.5 mb-2.5 mt-1">
+        <div v-if="canCreateTask" class="mx-2.5 mb-2.5 mt-1">
           <div v-if="addingTaskColumnId === board.id">
             <input v-model="newTaskTitle" @keyup.enter="handleCreateTask(board.id)"
               @keyup.esc="addingTaskColumnId = null; newTaskTitle = ''" placeholder="Task title..." autofocus
@@ -106,7 +138,7 @@
       </VueDraggable>
 
       <!-- Add Column -->
-      <div class="min-w-[240px] flex-shrink-0 pt-0.5">
+      <div v-if="canCreateColumn" class="min-w-[240px] flex-shrink-0 pt-0.5">
         <div v-if="!showNewBoard">
           <button @click="showNewBoard = true"
             class="w-full text-sm text-gray-400 border border-dashed border-gray-300 rounded-xl py-3 hover:border-blue-400 hover:text-blue-500 transition">
@@ -142,57 +174,37 @@
         <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100 flex-shrink-0">
           <div class="flex items-center gap-2">
             <div class="relative">
-              <button @click.stop="closeAllDropdowns(); statusOpen = !statusOpen"
+              <button @click.stop="toggleStatusMenu"
                 class="flex items-center gap-1.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition">
-                {{ selectedTask.status }}
+                {{ currentColumnTitle }}
                 <svg class="w-3 h-3" viewBox="0 0 10 6" fill="currentColor">
                   <path d="M0 0l5 6 5-6z" />
                 </svg>
               </button>
               <div v-if="statusOpen"
                 class="absolute left-0 top-10 bg-white border border-gray-200 rounded-xl shadow-xl z-20 py-1 min-w-[140px]">
-                <button v-for="s in statuses" :key="s" @click.stop="selectedTask.status = s; statusOpen = false"
-                  class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition"
-                  :class="selectedTask.status === s ? 'text-blue-600 font-semibold' : 'text-gray-700'">{{ s }}</button>
-              </div>
-            </div>
-            <button @click="handleSaveTask"
-              class="text-xs bg-blue-500 text-white px-3 py-1.5 rounded-lg hover:bg-blue-600 transition">Save</button>
-            <div class="relative">
-              <button @click.stop="closeAllDropdowns(); moveOpen = !moveOpen"
-                class="text-xs border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition text-gray-600">
-                Move to...
-              </button>
-              <div v-if="moveOpen"
-                class="absolute left-0 top-9 bg-white border border-gray-200 rounded-xl shadow-xl z-20 w-48 py-1">
-                <button v-for="col in allColumns" :key="col.id" @click.stop="handleMoveTask(col.id); moveOpen = false"
+                <button v-for="col in allColumns" :key="col.id" @click.stop="handleMoveTask(col.id); statusOpen = false"
                   class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition"
                   :class="col.id === selectedTask?.column_id ? 'text-blue-600 font-semibold' : 'text-gray-700'">
                   {{ col.title }}
                 </button>
               </div>
             </div>
-            <button @click="handleDeleteTask"
-              class="text-xs border border-red-200 text-red-500 px-3 py-1.5 rounded-lg hover:bg-red-50 transition">Delete</button>
           </div>
           <div class="flex items-center gap-1">
             <button
               class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition">
               <font-awesome-icon icon="image" />
             </button>
-            <button class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition"
-              :class="selectedTask._watching ? 'text-blue-500' : 'text-gray-500'" @click.stop="toggleWatch">
-              <font-awesome-icon icon="eye" />
-            </button>
             <div class="relative">
-              <button @click.stop="closeAllDropdowns(); ellipsisOpen = !ellipsisOpen"
+              <button @click.stop="toggleEllipsisMenu"
                 class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition">
                 <font-awesome-icon icon="ellipsis-h" />
               </button>
               <div v-if="ellipsisOpen"
                 class="absolute right-0 top-10 bg-white border border-gray-200 rounded-xl shadow-xl z-20 w-52 py-1.5 overflow-hidden">
                 <template v-for="item in ellipsisMenuItems" :key="item.action">
-                  <div v-if="item.action === 'share'" class="border-t border-gray-100 my-1"></div>
+                  <div v-if="item.action === 'leave' || item.action === 'delete'" class="border-t border-gray-100 my-1"></div>
                   <button @click.stop="handleEllipsisAction(item.action)"
                     class="w-full flex items-center gap-3 px-4 py-2 text-sm transition"
                     :class="item.danger ? 'text-red-500 hover:bg-red-50' : 'text-gray-700 hover:bg-gray-50'">
@@ -214,57 +226,93 @@
           <div class="flex-1 overflow-y-auto px-6 py-5">
             <div class="flex items-start gap-3 mb-5">
               <h2 contenteditable="true"
-                @blur="(e: FocusEvent) => { if (selectedTask && e.target) selectedTask.title = (e.target as HTMLElement).innerText }"
+                @blur="(e: FocusEvent) => handleTitleBlur((e.target as HTMLElement).innerText)"
                 class="text-xl font-bold text-gray-900 outline-none border-b-2 border-transparent focus:border-blue-400 flex-1 leading-tight">
                 {{ selectedTask.title }}</h2>
             </div>
 
-            <div class="flex flex-wrap gap-2 mb-6">
-              <div class="relative">
-                <button @click.stop="closeAllDropdowns(); addMenuOpen = !addMenuOpen"
-                  class="flex items-center gap-1.5 text-xs border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 text-gray-600 transition font-medium">
-                  <font-awesome-icon icon="plus" /> Add
-                </button>
-                <div v-if="addMenuOpen"
-                  class="absolute left-0 top-9 bg-white border border-gray-200 rounded-xl shadow-xl z-20 w-64 overflow-hidden">
-                  <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100">
-                    <span class="text-xs font-semibold text-gray-500">Add to card</span>
-                    <button @click.stop="addMenuOpen = false" class="text-gray-400 hover:text-gray-600">✕</button>
+            <!-- Action buttons: Add / Subtask / Attachment (baris 1), Members / Due date (baris 2) -->
+            <div class="mb-6">
+              <div class="flex flex-wrap gap-2 mb-2">
+                <div class="relative">
+                  <button @click.stop="toggleAddMenu"
+                    class="flex items-center gap-1.5 text-xs border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 text-gray-600 transition font-medium">
+                    <font-awesome-icon icon="plus" /> Add
+                  </button>
+                  <div v-if="addMenuOpen"
+                    class="absolute left-0 top-9 bg-white border border-gray-200 rounded-xl shadow-xl z-20 w-64 overflow-hidden">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100">
+                      <span class="text-xs font-semibold text-gray-500">Add to card</span>
+                      <button @click.stop="addMenuOpen = false" class="text-gray-400 hover:text-gray-600">✕</button>
+                    </div>
+                    <div class="py-1">
+                      <button v-for="item in addMenuItems" :key="item.action" @click.stop="handleAddAction(item.action)"
+                        class="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition text-left">
+                        <div
+                          class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 text-gray-600 text-xs">
+                          +</div>
+                        <div>
+                          <p class="text-sm font-medium text-gray-800">{{ item.label }}</p>
+                          <p class="text-xs text-gray-400 mt-0.5">{{ item.desc }}</p>
+                        </div>
+                      </button>
+                    </div>
                   </div>
-                  <div class="py-1">
-                    <button v-for="item in addMenuItems" :key="item.action" @click.stop="handleAddAction(item.action)"
-                      class="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition text-left">
-                      <div
-                        class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 text-gray-600 text-xs">
-                        +</div>
-                      <div>
-                        <p class="text-sm font-medium text-gray-800">{{ item.label }}</p>
-                        <p class="text-xs text-gray-400 mt-0.5">{{ item.desc }}</p>
+                </div>
+                <button @click.stop="closeAllDropdowns(); addingSubtask = !addingSubtask"
+                  class="flex items-center gap-1.5 text-xs border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 text-gray-600 transition">
+                  <font-awesome-icon icon="check-square" /> Subtask
+                </button>
+                <button @click.stop="showAttachPanel = !showAttachPanel"
+                  class="flex items-center gap-1.5 text-xs border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 text-gray-600 transition"
+                  :class="showAttachPanel ? 'bg-gray-100 border-gray-400' : ''">
+                  <font-awesome-icon icon="paperclip" /> Attachment
+                </button>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-4">
+                <div>
+                  <p class="text-xs text-gray-500 font-medium mb-1.5">Members</p>
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <div v-for="m in assignedMembers" :key="m.id" class="relative group/member">
+                      <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                        :class="m.color" :title="m.name">{{ m.initial }}</div>
+                      <button @click.stop="handleToggleMember(m.id)"
+                        class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-white border border-gray-300 text-gray-400 hover:text-red-500 hover:border-red-300 opacity-0 group-hover/member:opacity-100 transition text-[9px] flex items-center justify-center leading-none"
+                        title="Remove">✕</button>
+                    </div>
+                    <div class="relative">
+                      <button @click.stop="toggleMemberMenu"
+                        class="w-7 h-7 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 hover:border-blue-400 text-sm">+</button>
+                      <div v-if="memberMenuOpen"
+                        class="absolute left-0 top-9 bg-white border border-gray-200 rounded-xl shadow-xl z-20 w-56 py-1 max-h-64 overflow-y-auto">
+                        <button v-for="u in users" :key="u.id" @click.stop="handleToggleMember(u.id)"
+                          class="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-gray-50 transition text-left">
+                          <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
+                            :class="memberColor(u.id)">{{ (u.full_name || u.email || '?').charAt(0).toUpperCase() }}</div>
+                          <span class="flex-1 truncate text-gray-700">{{ u.full_name || u.email }}</span>
+                          <font-awesome-icon v-if="(selectedTask?.assignee_ids ?? []).includes(u.id)" icon="check"
+                            class="text-blue-500 text-xs" />
+                        </button>
+                        <p v-if="!users.length" class="px-3 py-2 text-xs text-gray-400">Tidak ada user.</p>
                       </div>
-                    </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <p class="text-xs text-gray-500 font-medium mb-1.5">Due date</p>
+                  <div class="flex items-center gap-1.5">
+                    <span v-if="dueDateStatus(selectedTask.dueDate) === 'overdue' || dueDateStatus(selectedTask.dueDate) === 'soon'"
+                      class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0"
+                      :class="dueDateBadgeClass(dueDateStatus(selectedTask.dueDate))">
+                      {{ dueDateStatus(selectedTask.dueDate) === 'overdue' ? 'Overdue' : 'Due Soon' }}
+                    </span>
+                    <input type="date" :value="dueDateInputValue(selectedTask.dueDate)" @change="handleDueDateChange"
+                      class="text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 px-2.5 py-1.5 rounded-lg transition outline-none" />
                   </div>
                 </div>
               </div>
-              <button @click.stop="closeAllDropdowns(); addingSubtask = !addingSubtask"
-                class="flex items-center gap-1.5 text-xs border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 text-gray-600 transition">
-                <font-awesome-icon icon="check-square" /> Subtask
-              </button>
-              <button @click.stop="showAttachPanel = !showAttachPanel"
-                class="flex items-center gap-1.5 text-xs border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 text-gray-600 transition"
-                :class="showAttachPanel ? 'bg-gray-100 border-gray-400' : ''">
-                <font-awesome-icon icon="paperclip" /> Attachment
-              </button>
-            </div>
-
-            <div class="mb-6">
-              <p class="text-xs text-gray-500 font-medium mb-2">Due date</p>
-              <button
-                class="flex items-center gap-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition">
-                {{ selectedTask.dueDate }}
-                <svg class="w-3 h-3" viewBox="0 0 10 6" fill="currentColor">
-                  <path d="M0 0l5 6 5-6z" />
-                </svg>
-              </button>
             </div>
 
             <div class="mb-6">
@@ -272,7 +320,7 @@
                 <font-awesome-icon icon="align-left" class="text-gray-500 text-sm" />
                 <p class="text-sm font-semibold text-gray-700">Description</p>
               </div>
-              <textarea v-model="selectedTask.description" placeholder="Add a more detailed description..." rows="3"
+              <textarea v-model="selectedTask.description" @blur="handleDescriptionBlur" placeholder="Add a more detailed description..." rows="3"
                 class="w-full text-sm text-gray-600 border border-gray-200 rounded-lg px-3 py-2.5 outline-none focus:border-blue-400 resize-none transition placeholder-gray-400"></textarea>
             </div>
 
@@ -374,7 +422,7 @@
                     :class="sub.completed ? 'line-through text-gray-400' : 'text-gray-700'">
                     {{ sub.title }}
                   </span>
-                  <button @click="handleDeleteSubtask(sub.id)"
+                  <button v-if="canDeleteTask" @click="handleDeleteSubtask(sub.id)"
                     class="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition text-xs px-1">✕</button>
                 </div>
               </div>
@@ -420,42 +468,13 @@
                         'File' }}</p>
                     </div>
                   </div>
-                  <button @click="handleDeleteAttachment(att.id, i)"
+                  <button v-if="canDeleteTask" @click="handleDeleteAttachment(att.id, i)"
                     class="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition text-xs flex-shrink-0 px-1"
                     title="Delete">✕</button>
                 </div>
               </div>
             </div>
 
-            <!-- Members -->
-            <div class="mb-6">
-              <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Members</p>
-              <div class="flex items-center gap-2 flex-wrap">
-                <div v-for="m in assignedMembers" :key="m.id" class="relative group/member">
-                  <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                    :class="m.color" :title="m.name">{{ m.initial }}</div>
-                  <button @click.stop="handleToggleMember(m.id)"
-                    class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-white border border-gray-300 text-gray-400 hover:text-red-500 hover:border-red-300 opacity-0 group-hover/member:opacity-100 transition text-[9px] flex items-center justify-center leading-none"
-                    title="Remove">✕</button>
-                </div>
-                <div class="relative">
-                  <button @click.stop="closeAllDropdowns(); memberMenuOpen = !memberMenuOpen"
-                    class="w-8 h-8 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 hover:border-blue-400 text-sm">+</button>
-                  <div v-if="memberMenuOpen"
-                    class="absolute left-0 top-9 bg-white border border-gray-200 rounded-xl shadow-xl z-20 w-56 py-1 max-h-64 overflow-y-auto">
-                    <button v-for="u in users" :key="u.id" @click.stop="handleToggleMember(u.id)"
-                      class="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-gray-50 transition text-left">
-                      <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
-                        :class="memberColor(u.id)">{{ (u.full_name || u.email || '?').charAt(0).toUpperCase() }}</div>
-                      <span class="flex-1 truncate text-gray-700">{{ u.full_name || u.email }}</span>
-                      <font-awesome-icon v-if="(selectedTask?.assignee_ids ?? []).includes(u.id)" icon="check"
-                        class="text-blue-500 text-xs" />
-                    </button>
-                    <p v-if="!users.length" class="px-3 py-2 text-xs text-gray-400">Tidak ada user.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
 
           <!-- RIGHT: Comments -->
@@ -490,7 +509,7 @@
                       <span class="text-xs font-semibold text-gray-800">{{ act.author }}</span>
                       <span class="text-xs text-gray-500">{{ act.action }}</span>
                     </div>
-                    <button v-if="act.comment && act.id" @click="handleDeleteComment(act.id, i)"
+                    <button v-if="act.comment && act.id && canDeleteTask" @click="handleDeleteComment(act.id, i)"
                       class="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition text-xs"
                       title="Delete">✕</button>
                   </div>
@@ -542,6 +561,73 @@
     </div>
   </Teleport>
 
+  <!-- Board Members Panel -->
+  <Teleport to="body">
+    <div v-if="showMembersPanel" class="fixed inset-0 z-50 flex items-center justify-center"
+      style="background: rgba(0,0,0,0.65)" @click.self="showMembersPanel = false">
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 flex flex-col overflow-hidden" style="max-height: 85vh">
+        <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100 flex-shrink-0">
+          <p class="text-sm font-semibold text-gray-800">Board Members</p>
+          <button @click="showMembersPanel = false"
+            class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 transition">
+            <font-awesome-icon icon="times" />
+          </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto px-5 py-4">
+          <p v-if="membersLoading" class="text-xs text-gray-400">Memuat…</p>
+          <p v-else-if="!boardMemberList.length" class="text-xs text-gray-400">Belum ada member.</p>
+
+          <div v-else class="space-y-2">
+            <div v-for="m in boardMemberList" :key="m.id"
+              class="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-50 transition">
+              <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                :class="memberColor(m.user_id)">{{ resolveUserLabel(m.user_id).initial }}</div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm text-gray-700 truncate">{{ resolveUserLabel(m.user_id).name }}</p>
+              </div>
+              <select v-if="canChangeMemberRole" :value="m.role" :disabled="isSoleOwner(m.user_id)"
+                @change="handleUpdateMemberRole(m.user_id, ($event.target as HTMLSelectElement).value as BoardRole)"
+                :title="isSoleOwner(m.user_id) ? 'Satu-satunya owner — tidak bisa diubah' : ''"
+                class="text-xs border border-gray-200 rounded-lg px-2 py-1 outline-none focus:border-blue-400 transition bg-white disabled:opacity-50 disabled:cursor-not-allowed">
+                <option value="owner">Owner</option>
+                <option value="admin">Admin</option>
+                <option value="member">Member</option>
+              </select>
+              <span v-else class="text-xs text-gray-500 bg-gray-100 rounded-full px-2 py-0.5 capitalize">{{ m.role }}</span>
+              <button v-if="canRemoveMember" @click="handleRemoveMember(m.user_id)" :disabled="isSoleOwner(m.user_id)"
+                :class="isSoleOwner(m.user_id) ? 'text-gray-200 cursor-not-allowed' : 'text-gray-300 hover:text-red-400'"
+                :title="isSoleOwner(m.user_id) ? 'Tidak bisa menghapus satu-satunya owner' : 'Remove'"
+                class="transition text-xs px-1">✕</button>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="canInviteMember" class="border-t border-gray-100 px-5 py-4 flex-shrink-0">
+          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Add Member</p>
+          <div class="flex gap-2">
+            <select v-model="newMemberUserId"
+              class="flex-1 min-w-0 text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-400 transition bg-white">
+              <option value="" disabled>Pilih user...</option>
+              <option v-for="u in addableUsers" :key="u.id" :value="u.id">{{ u.full_name || u.email }}</option>
+            </select>
+            <select v-model="newMemberRole"
+              class="text-sm border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-blue-400 transition bg-white">
+              <option value="member">Member</option>
+              <option value="admin">Admin</option>
+              <option value="owner">Owner</option>
+            </select>
+            <button @click="handleAddMember" :disabled="!newMemberUserId || memberActionLoading"
+              class="bg-blue-500 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-blue-600 disabled:opacity-50 transition flex-shrink-0">
+              Add
+            </button>
+          </div>
+          <p v-if="!addableUsers.length" class="text-xs text-gray-400 mt-2">Semua user sudah jadi member.</p>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
   <!-- Toast -->
   <Teleport to="body">
     <Transition name="toast">
@@ -556,7 +642,11 @@
 <script setup lang="ts">
 import { VueDraggable } from 'vue-draggable-plus'
 import { moveTask as apiMoveTask } from '../api/task.api'
-import { reorderColumn as apiReorderColumn } from '../api/column.api'
+import {
+  reorderColumn as apiReorderColumn,
+  updateColumn as apiUpdateColumn,
+  deleteColumn as apiDeleteColumn,
+} from '../api/column.api'
 import { useRoute, useRouter } from 'vue-router'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import Layout from '../../../components/common/AppLayout.vue'
@@ -564,7 +654,7 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import {
   faClock, faPlay, faStop, faPlus, faTag, faCheckSquare, faPaperclip,
-  faAlignLeft, faEye, faImage, faEllipsisH, faTimes, faCommentAlt, faCheck,
+  faAlignLeft, faEye, faImage, faEllipsisH, faTimes, faCommentAlt, faCheck, faUsers,
 } from '@fortawesome/free-solid-svg-icons'
 import {
   addComment as apiAddComment,
@@ -591,6 +681,10 @@ import {
 import type { TimerLog } from '../../timer/utils/timer.format'
 import { useAppStore } from '../store/board.store'
 import { storeToRefs } from 'pinia'
+import type { BoardRole } from '../api/board-member.api'
+import { hasPermission, permissionErrorMessage } from '../utils/board-permission.util'
+import { dueDateStatus, dueDateBadgeClass, dueDateInputValue } from '../utils/due-date.util'
+import { useAuth } from '../../../composables/useAuth'
 
 // ─── Types ────────────────────────────────────────────────────
 interface ActivityItem {
@@ -622,18 +716,19 @@ interface Task {
   dueDate?: string
   label?: string
   labelClass?: string
-  _watching?: boolean
 }
 
-library.add(faClock, faPlay, faStop, faPlus, faTag, faCheckSquare, faPaperclip, faAlignLeft, faEye, faImage, faEllipsisH, faTimes, faCommentAlt, faCheck)
+library.add(faClock, faPlay, faStop, faPlus, faTag, faCheckSquare, faPaperclip, faAlignLeft, faEye, faImage, faEllipsisH, faTimes, faCommentAlt, faCheck, faUsers)
 
 const route = useRoute()
 const router = useRouter()
 const boardId = route.params.boardId as string
 const store = useAppStore()
-const { columnsByBoard, users } = storeToRefs(store)
+const { columnsByBoard, users, boards: boardList, boardMembers } = storeToRefs(store)
 const boards = computed(() => columnsByBoard.value[boardId] ?? [])
-const moveOpen = ref(false)
+
+const { user: currentUser, fetchCurrentUser } = useAuth()
+const currentBoard = computed(() => boardList.value.find((b: any) => b.id === boardId))
 
 // ─── Task State ───────────────────────────────────────────────
 const newTaskTitle = ref('')
@@ -646,6 +741,9 @@ const statusOpen = ref(false)
 const ellipsisOpen = ref(false)
 const addMenuOpen = ref(false)
 const memberMenuOpen = ref(false)
+const openColumnMenuId = ref<string | null>(null)
+const renamingColumnId = ref<string | null>(null)
+const renameColumnTitle = ref('')
 const newComment = ref('')
 const commentLoading = ref(false)
 const showAttachPanel = ref(false)
@@ -665,6 +763,13 @@ const newSubtaskTitle = ref('')
 const addingSubtask = ref(false)
 const subtaskCreating = ref(false)
 
+// ─── Board Members Panel State ─────────────────────────────────
+const showMembersPanel = ref(false)
+const membersLoading = ref(false)
+const memberActionLoading = ref(false)
+const newMemberUserId = ref('')
+const newMemberRole = ref<BoardRole>('member')
+
 // ─── Timer State ──────────────────────────────────────────────
 const activeTimerTaskId = ref<string | null>(null)
 const timerSeconds = ref<Record<string, number>>({})
@@ -676,6 +781,21 @@ let tickInterval: ReturnType<typeof setInterval> | null = null
 let pingInterval: ReturnType<typeof setInterval> | null = null
 let toastTimer: ReturnType<typeof setTimeout> | null = null
 let originalTaskSnapshot: { title: string; description: string } | null = null
+
+// ─── Due Date ─────────────────────────────────────────────────
+async function handleDueDateChange(e: Event) {
+  if (!selectedTask.value) return
+  const value = (e.target as HTMLInputElement).value
+  const iso = value ? new Date(`${value}T00:00:00`).toISOString() : null
+  try {
+    await store.editTask(selectedTask.value.id, { due_date: iso })
+    selectedTask.value.dueDate = iso ?? '-'
+    logActivity(iso ? `mengatur due date ke ${formatLogDate(iso)}` : 'menghapus due date')
+    showToast('Due date diperbarui.')
+  } catch (err: any) {
+    showToast(apiErrorMessage(err, 'Gagal mengubah due date.'))
+  }
+}
 
 // ─── Helpers ──────────────────────────────────────────────────
 const memberPalette = ['bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-pink-500', 'bg-purple-500', 'bg-cyan-600', 'bg-rose-500', 'bg-indigo-500']
@@ -700,6 +820,106 @@ function resolveMembers(ids?: string[]) {
 }
 
 const assignedMembers = computed(() => resolveMembers(selectedTask.value?.assignee_ids))
+
+function resolveUserLabel(userId: string): { name: string; initial: string } {
+  const u = users.value.find((u: any) => u.id === userId)
+  const name = u?.full_name ?? u?.email ?? 'Unknown'
+  return { name, initial: name.charAt(0).toUpperCase() }
+}
+
+// ─── Board Members ──────────────────────────────────────────────
+const boardMemberList = computed(() => boardMembers.value[boardId] ?? [])
+const boardMemberUserIds = computed(() => boardMemberList.value.map((m: any) => m.user_id))
+const myBoardRole = computed<BoardRole | null>(() => store.getMyRole(boardId, currentUser.value?.id))
+const canInviteMember = computed(() => hasPermission(myBoardRole.value, 'member.invite'))
+const canRemoveMember = computed(() => hasPermission(myBoardRole.value, 'member.remove'))
+const canChangeMemberRole = computed(() => hasPermission(myBoardRole.value, 'member.change_role'))
+const addableUsers = computed(() => users.value.filter((u: any) => !boardMemberUserIds.value.includes(u.id)))
+
+// Backend TIDAK punya proteksi "jangan hapus/demote owner terakhir" sama
+// sekali (board_member/repository.py soft_delete & update tidak ada
+// pengecekan role apapun) — ini murni safety-net di frontend.
+const ownerCount = computed(() => boardMemberList.value.filter((m: any) => m.role === 'owner').length)
+
+function isSoleOwner(userId: string): boolean {
+  const m = boardMemberList.value.find((mm: any) => mm.user_id === userId)
+  return m?.role === 'owner' && ownerCount.value === 1
+}
+
+const canCreateTask = computed(() => hasPermission(myBoardRole.value, 'task.create'))
+const canDeleteTask = computed(() => hasPermission(myBoardRole.value, 'task.delete'))
+const canCreateColumn = computed(() => hasPermission(myBoardRole.value, 'column.create'))
+const canRenameColumn = computed(() => hasPermission(myBoardRole.value, 'column.rename'))
+const canDeleteColumn = computed(() => hasPermission(myBoardRole.value, 'column.delete'))
+
+async function openMembersPanel() {
+  showMembersPanel.value = true
+  membersLoading.value = true
+  try {
+    await Promise.all([store.fetchBoardMembers(boardId), store.fetchUsers()])
+  } catch (e: any) {
+    showToast(apiErrorMessage(e, 'Gagal memuat board members.'))
+  } finally {
+    membersLoading.value = false
+  }
+}
+
+async function handleAddMember() {
+  if (!newMemberUserId.value || memberActionLoading.value) return
+  memberActionLoading.value = true
+  try {
+    await store.addBoardMemberToStore(boardId, newMemberUserId.value, newMemberRole.value)
+    showToast('Member added.')
+    newMemberUserId.value = ''
+    newMemberRole.value = 'member'
+  } catch (e: any) {
+    showToast(apiErrorMessage(e, 'Gagal menambah member.'))
+  } finally {
+    memberActionLoading.value = false
+  }
+}
+
+async function handleUpdateMemberRole(userId: string, role: BoardRole) {
+  if (role !== 'owner' && isSoleOwner(userId)) {
+    showToast('Tidak bisa mengubah role satu-satunya owner board ini. Jadikan user lain owner dulu.')
+    return
+  }
+  try {
+    await store.updateBoardMemberRoleInStore(boardId, userId, role)
+    showToast('Role diperbarui.')
+  } catch (e: any) {
+    showToast(apiErrorMessage(e, 'Gagal mengubah role.'))
+  }
+}
+
+async function removeBoardMember(userId: string) {
+  const isSelf = userId === currentUser.value?.id
+
+  if (isSoleOwner(userId)) {
+    showToast(isSelf
+      ? 'Anda satu-satunya owner board ini — tidak bisa keluar. Jadikan user lain owner dulu.'
+      : 'Tidak bisa menghapus satu-satunya owner board ini. Jadikan user lain owner dulu.')
+    return
+  }
+
+  const confirmMsg = isSelf
+    ? 'Anda akan keluar dari board ini dan kehilangan akses ke board ini. Lanjutkan?'
+    : 'Hapus member ini dari board?'
+  if (!window.confirm(confirmMsg)) return
+
+  try {
+    await store.removeBoardMemberFromStore(boardId, userId)
+    showToast(isSelf ? 'Anda telah keluar dari board.' : 'Member dihapus.')
+    if (isSelf) router.replace('/boards')
+  } catch (e: any) {
+    showToast(apiErrorMessage(e, isSelf ? 'Gagal keluar dari board.' : 'Gagal menghapus member.'))
+  }
+}
+
+async function handleRemoveMember(userId: string) {
+  await removeBoardMember(userId)
+}
+
 function findTaskById(id: string): Task | null {
   for (const board of boards.value) {
     const t = (board.tasks ?? []).find((t: Task) => t.id === id)
@@ -712,6 +932,14 @@ function showToast(msg: string) {
   toast.value = msg
   if (toastTimer) clearTimeout(toastTimer)
   toastTimer = setTimeout(() => { toast.value = '' }, 2500)
+}
+
+// Request gagal karena permission (403) → pesan jelas, bukan raw backend string.
+function apiErrorMessage(e: any, fallback: string): string {
+  if (e?.response?.status === 403) {
+    return permissionErrorMessage(e?.response?.data?.error?.message)
+  }
+  return e?.response?.data?.error?.message || fallback
 }
 
 // ─── Timer ────────────────────────────────────────────────────
@@ -731,7 +959,7 @@ function stopTick() {
 function startPing(taskId: string) {
   if (pingInterval) clearInterval(pingInterval)
   pingInterval = setInterval(async () => {
-    try { await apiPingTimer(taskId) } catch { }
+    try { await apiPingTimer(taskId, boardId) } catch { }
   }, 120000)
 }
 
@@ -749,10 +977,10 @@ async function onTaskDragEnd(event: any) {
   if (!taskId || !toColumnId || fromColumnId === toColumnId) return
 
   try {
-    await apiMoveTask(taskId, toColumnId, newIndex + 1)
+    await apiMoveTask(taskId, toColumnId, newIndex + 1, boardId)
     showToast('Task moved!')
   } catch (e: any) {
-    showToast(e?.response?.data?.error?.message || 'Gagal memindahkan task.')
+    showToast(apiErrorMessage(e, 'Gagal memindahkan task.'))
     // JANGAN fetch ulang — biarkan vue-draggable handle UI
   }
 }
@@ -762,10 +990,50 @@ async function onColumnDragEnd(event: any) {
   if (!columnId) return
 
   try {
-    await apiReorderColumn(columnId, event.newIndex + 1)
+    await apiReorderColumn(columnId, event.newIndex + 1, boardId)
   } catch (e: any) {
-    showToast(e?.response?.data?.error?.message || 'Gagal mengubah urutan column.')
+    showToast(apiErrorMessage(e, 'Gagal mengubah urutan column.'))
     // JANGAN fetch ulang — biarkan vue-draggable handle UI
+  }
+}
+
+function startRenameColumn(column: any) {
+  openColumnMenuId.value = null
+  renamingColumnId.value = column.id
+  renameColumnTitle.value = column.title
+}
+
+async function handleRenameColumnSubmit(column: any) {
+  const title = renameColumnTitle.value.trim()
+  renamingColumnId.value = null
+  if (!title || title === column.title) return
+  try {
+    await apiUpdateColumn(column.id, boardId, { title })
+    column.title = title
+  } catch (e: any) {
+    showToast(apiErrorMessage(e, 'Gagal mengubah nama column.'))
+  }
+}
+
+// Catatan: backend cuma soft-delete column-nya sendiri, TIDAK cascade-delete
+// task di dalamnya (tidak ada ON DELETE CASCADE / cascade logic di
+// column/use_cases.py). Task-nya tetap ada di database, tapi jadi tidak bisa
+// diakses lagi karena endpoint task selalu cek dulu apakah column induknya
+// masih ada. Makanya pesannya "tidak bisa diakses lagi", bukan "terhapus".
+async function handleDeleteColumn(column: any) {
+  openColumnMenuId.value = null
+  const taskCount = column.tasks?.length ?? 0
+  const warning = taskCount > 0
+    ? `Column "${column.title}" berisi ${taskCount} card. Semua card di dalamnya akan langsung tidak bisa diakses lagi setelah column ini dihapus, dan tindakan ini TIDAK BISA dibatalkan dari sini. Lanjutkan?`
+    : `Hapus column "${column.title}"? Tindakan ini tidak bisa dibatalkan dari sini.`
+  if (!window.confirm(warning)) return
+  try {
+    await apiDeleteColumn(column.id, boardId)
+    const list = columnsByBoard.value[boardId]
+    if (list) columnsByBoard.value[boardId] = list.filter((c: any) => c.id !== column.id)
+    showToast('Column dihapus.')
+  } catch (e: any) {
+    showToast(apiErrorMessage(e, 'Gagal menghapus column.'))
   }
 }
 
@@ -780,7 +1048,7 @@ async function handleAddSubtask() {
     logActivity(`menambahkan checklist "${title}"`)
     showToast('Subtask added.')
   } catch (e: any) {
-    showToast(e?.response?.data?.error?.message || 'Gagal menambah subtask.')
+    showToast(apiErrorMessage(e, 'Gagal menambah subtask.'))
   } finally {
     subtaskCreating.value = false
   }
@@ -797,7 +1065,7 @@ async function handleToggleSubtask(subtaskId: string, completed: boolean) {
         : `membuka kembali checklist "${sub.title}"`)
     }
   } catch (e: any) {
-    showToast(e?.response?.data?.error?.message || 'Gagal update subtask.')
+    showToast(apiErrorMessage(e, 'Gagal update subtask.'))
   }
 }
 
@@ -814,7 +1082,7 @@ async function handleRenameSubtask(subtaskId: string, oldTitle: string, newTitle
   } catch (e: any) {
     const sub = selectedTask.value.subtasks?.find(s => s.id === subtaskId)
     if (sub) sub.title = oldTitle
-    showToast(e?.response?.data?.error?.message || 'Gagal mengubah nama subtask.')
+    showToast(apiErrorMessage(e, 'Gagal mengubah nama subtask.'))
   }
 }
 
@@ -824,7 +1092,7 @@ async function handleDeleteSubtask(subtaskId: string) {
     await store.removeSubtask(subtaskId, selectedTask.value.id)
     showToast('Subtask deleted.')
   } catch (e: any) {
-    showToast(e?.response?.data?.error?.message || 'Gagal menghapus subtask.')
+    showToast(apiErrorMessage(e, 'Gagal menghapus subtask.'))
   }
 }
 
@@ -837,30 +1105,32 @@ async function handleTimerToggle(task: Task) {
     await doStopTimer(task.id)
   } else {
     try {
-      await apiStartTimer(task.id, timerDescription.value)
+      await apiStartTimer(task.id, boardId, timerDescription.value)
       activeTimerTaskId.value = task.id
       if (!timerSeconds.value[task.id]) timerSeconds.value[task.id] = 0
       localStorage.setItem('active_timer_task_id', task.id)
       localStorage.setItem('active_timer_task_title', task.title ?? '')
+      localStorage.setItem('active_timer_board_id', boardId)
       timerDescription.value = ''
       startTick(task.id)
       startPing(task.id)
       showToast('Timer started ▶')
     } catch (e: any) {
-      showToast(e?.response?.data?.error?.message || 'Gagal memulai timer.')
+      showToast(apiErrorMessage(e, 'Gagal memulai timer.'))
     }
   }
 }
 
 async function doStopTimer(taskId: string) {
   try {
-    await apiStopTimer(taskId)
+    await apiStopTimer(taskId, boardId)
     stopTick()
     stopPing()
     const elapsed = timerSeconds.value[taskId] || 0
     activeTimerTaskId.value = null
     localStorage.removeItem('active_timer_task_id')
     localStorage.removeItem('active_timer_task_title')
+    localStorage.removeItem('active_timer_board_id')
     showToast(`Timer stopped ⏹ — ${formatTimer(elapsed)}`)
 
     // Log baru baru tercatat di backend setelah stop — tarik ulang biar langsung tampil.
@@ -868,16 +1138,16 @@ async function doStopTimer(taskId: string) {
       await loadTimerLogs(taskId)
     }
   } catch (e: any) {
-    showToast(e?.response?.data?.error?.message || 'Gagal menghentikan timer.')
+    showToast(apiErrorMessage(e, 'Gagal menghentikan timer.'))
   }
 }
 
 async function handleConfirmTimer(taskId: string) {
   try {
-    await apiConfirmTimer(taskId)
+    await apiConfirmTimer(taskId, boardId)
     showToast('Timer confirmed ✓')
   } catch (e: any) {
-    showToast(e?.response?.data?.error?.message || 'Gagal konfirmasi timer.')
+    showToast(apiErrorMessage(e, 'Gagal konfirmasi timer.'))
   }
 }
 
@@ -886,10 +1156,10 @@ async function loadTimerLogs(taskId: string) {
   timerLogsLoading.value = true
   timerLogsError.value = ''
   try {
-    timerLogs.value = await apiGetTimerLogs(taskId)
+    timerLogs.value = await apiGetTimerLogs(taskId, boardId)
   } catch (e: any) {
     timerLogs.value = []
-    timerLogsError.value = e?.response?.data?.error?.message || 'Gagal memuat time log.'
+    timerLogsError.value = apiErrorMessage(e, 'Gagal memuat time log.')
   } finally {
     timerLogsLoading.value = false
   }
@@ -905,7 +1175,7 @@ async function handleCreateTask(columnId: string) {
     addingTaskColumnId.value = null
     showToast('Task created!')
   } catch (e: any) {
-    showToast(e?.response?.data?.error?.message || 'Gagal membuat task.')
+    showToast(apiErrorMessage(e, 'Gagal membuat task.'))
   } finally {
     taskCreating.value = false
   }
@@ -932,13 +1202,19 @@ async function handleCreateBoard() {
     showNewBoard.value = false
     showToast(`Column "${col.title}" created!`)
   } catch (e: any) {
-    showToast(e?.response?.data?.error?.message || 'Gagal membuat column.')
+    showToast(apiErrorMessage(e, 'Gagal membuat column.'))
   } finally {
     boardCreating.value = false
   }
 }
 
-onMounted(() => { initBoards(); store.fetchUsers() })
+onMounted(() => {
+  initBoards()
+  store.fetchBoards()
+  store.fetchUsers()
+  store.fetchBoardMembers(boardId).catch(() => { })
+  if (!currentUser.value) fetchCurrentUser()
+})
 onUnmounted(() => { stopTick(); stopPing() })
 // ─── Task Actions ─────────────────────────────────────
 async function handleDeleteTask() {
@@ -949,35 +1225,52 @@ async function handleDeleteTask() {
     closeModal()
     showToast('Task deleted.')
   } catch (e: any) {
-    showToast(e?.response?.data?.error?.message || 'Gagal menghapus task.')
+    showToast(apiErrorMessage(e, 'Gagal menghapus task.'))
   }
 }
 
-async function handleSaveTask() {
+// Auto-save saat blur — title & description tidak lagi punya tombol Save terpisah.
+async function handleTitleBlur(newTitle: string) {
   if (!selectedTask.value) return
-  const prev = originalTaskSnapshot
-  const nextTitle = selectedTask.value.title
-  const nextDescription = selectedTask.value.description ?? ''
+  const oldTitle = originalTaskSnapshot?.title ?? selectedTask.value.title
+  const trimmed = newTitle.trim()
+  if (!trimmed || trimmed === oldTitle) {
+    selectedTask.value.title = oldTitle
+    return
+  }
+  selectedTask.value.title = trimmed
   try {
-    await store.editTask(selectedTask.value.id, {
-      title: nextTitle,
-      description: nextDescription,
-      status: selectedTask.value.status,
-    })
-    if (prev) {
-      if (prev.title !== nextTitle) logActivity(`mengubah judul card menjadi "${nextTitle}"`)
-      if (prev.description !== nextDescription) logActivity('mengubah deskripsi card')
-    }
-    originalTaskSnapshot = { title: nextTitle, description: nextDescription }
-    showToast('Task saved.')
+    await store.editTask(selectedTask.value.id, { title: trimmed })
+    logActivity(`mengubah judul card menjadi "${trimmed}"`)
+    if (originalTaskSnapshot) originalTaskSnapshot.title = trimmed
   } catch (e: any) {
-    showToast(e?.response?.data?.error?.message || 'Gagal menyimpan task.')
+    selectedTask.value.title = oldTitle
+    showToast(apiErrorMessage(e, 'Gagal menyimpan judul.'))
   }
 }
 
-// columns list untuk move task dropdown
+async function handleDescriptionBlur() {
+  if (!selectedTask.value) return
+  const next = selectedTask.value.description ?? ''
+  const prev = originalTaskSnapshot?.description ?? ''
+  if (next === prev) return
+  try {
+    await store.editTask(selectedTask.value.id, { description: next })
+    logActivity('mengubah deskripsi card')
+    if (originalTaskSnapshot) originalTaskSnapshot.description = next
+  } catch (e: any) {
+    selectedTask.value.description = prev
+    showToast(apiErrorMessage(e, 'Gagal menyimpan deskripsi.'))
+  }
+}
+
+// columns list untuk dropdown pindah task antar column
 const allColumns = computed(() => {
   return columnsByBoard.value[boardId] ?? []
+})
+
+const currentColumnTitle = computed(() => {
+  return allColumns.value.find((c: any) => c.id === selectedTask.value?.column_id)?.title ?? '-'
 })
 
 async function handleMoveTask(toColumnId: string) {
@@ -989,10 +1282,9 @@ async function handleMoveTask(toColumnId: string) {
   try {
     await store.moveTaskToColumn(task.id, fromColumnId, toColumnId)
     if (toColumn) logActivityOn(task, `memindahkan card ke "${toColumn.title}"`)
-    closeModal()
     showToast('Task moved.')
   } catch (e: any) {
-    showToast(e?.response?.data?.error?.message || 'Gagal memindahkan task.')
+    showToast(apiErrorMessage(e, 'Gagal memindahkan task.'))
   }
 }
 
@@ -1011,44 +1303,72 @@ async function handleToggleMember(userId: string) {
         : `menambahkan ${user.full_name} ke card ini`)
     }
   } catch (e: any) {
-    showToast(e?.response?.data?.error?.message || 'Gagal mengubah member.')
+    showToast(apiErrorMessage(e, 'Gagal mengubah member.'))
   }
 }
 
 // ─── Dropdowns ────────────────────────────────────────────────
+// Bug lama: `closeAllDropdowns(); xOpen = !xOpen` selalu berakhir true,
+// karena closeAllDropdowns() men-set xOpen ke false SEBELUM baru di-flip.
+// Jadi dropdown tidak pernah tertutup lewat klik ulang. Fix: simpan target
+// state dulu, baru tutup semua, baru terapkan.
 function closeAllDropdowns() {
   statusOpen.value = false
   ellipsisOpen.value = false
   addMenuOpen.value = false
-  moveOpen.value = false
   memberMenuOpen.value = false
+  openColumnMenuId.value = null
 }
 
-const ellipsisMenuItems = [
-  { label: 'Leave', action: 'leave', danger: false },
-  { label: 'Move', action: 'move', danger: false },
-  { label: 'Copy', action: 'copy', danger: false },
-  { label: 'Mirror', action: 'mirror', danger: false },
-  { label: 'Make template', action: 'template', danger: false },
-  { label: 'Watch', action: 'watch', danger: false },
-  { label: 'Share', action: 'share', danger: false },
-  { label: 'Archive', action: 'archive', danger: true },
-]
+function toggleStatusMenu() {
+  const next = !statusOpen.value
+  closeAllDropdowns()
+  statusOpen.value = next
+}
+
+function toggleEllipsisMenu() {
+  const next = !ellipsisOpen.value
+  closeAllDropdowns()
+  ellipsisOpen.value = next
+}
+
+function toggleAddMenu() {
+  const next = !addMenuOpen.value
+  closeAllDropdowns()
+  addMenuOpen.value = next
+}
+
+function toggleMemberMenu() {
+  const next = !memberMenuOpen.value
+  closeAllDropdowns()
+  memberMenuOpen.value = next
+}
+
+function toggleColumnMenu(columnId: string) {
+  const next = openColumnMenuId.value === columnId ? null : columnId
+  closeAllDropdowns()
+  openColumnMenuId.value = next
+}
+
+// Move/Copy/Mirror/Make template/Watch/Archive dihapus dari sini — tidak ada
+// endpoint/field backend yang mendukung (cek task model & task/views.py):
+// tidak ada endpoint duplicate/mirror/template, tidak ada field
+// watchers/archived. "Move" juga redundant dengan dropdown column di atas
+// (sudah pindah task antar column lewat PATCH /tasks/{id}/move).
+const ellipsisMenuItems = computed(() => {
+  const items: { label: string; action: string; danger: boolean }[] = [
+    { label: 'Share', action: 'share', danger: false },
+  ]
+  if (canRemoveMember.value) items.push({ label: 'Leave board', action: 'leave', danger: true })
+  if (canDeleteTask.value) items.push({ label: 'Delete', action: 'delete', danger: true })
+  return items
+})
 
 function handleEllipsisAction(action: string) {
   ellipsisOpen.value = false
-  if (action === 'watch') { toggleWatch(); return }
   if (action === 'share') { navigator.clipboard?.writeText(window.location.href).catch(() => { }); showToast('Link copied!'); return }
-  if (action === 'archive') { logActivity('archived this card'); showToast('Card archived.'); return }
-  if (action === 'leave') { logActivity('left this card'); showToast('You left this card.'); return }
-  showToast('Coming soon.')
-}
-
-function toggleWatch() {
-  if (!selectedTask.value) return
-  selectedTask.value._watching = !selectedTask.value._watching
-  logActivity(selectedTask.value._watching ? 'is watching this card' : 'stopped watching this card')
-  showToast(selectedTask.value._watching ? 'Watching this card.' : 'Stopped watching.')
+  if (action === 'leave') { const myId = currentUser.value?.id; if (myId) removeBoardMember(myId); return }
+  if (action === 'delete') { handleDeleteTask(); return }
 }
 
 const addMenuItems = [
@@ -1065,8 +1385,6 @@ function handleAddAction(action: string) {
   if (action === 'members') { memberMenuOpen.value = true; return }
   showToast(`${action} — coming soon.`)
 }
-
-const statuses = ['To Do', 'Doing', 'In Review', 'Done']
 
 // ─── Modal ────────────────────────────────────────────────────
 function openModal(task: Task) {
@@ -1098,7 +1416,7 @@ async function handleAddComment() {
   if (!selectedTask.value.id) { showToast('Task ID belum tersedia.'); return }
   commentLoading.value = true
   try {
-    await apiAddComment(selectedTask.value.id, content)
+    await apiAddComment(selectedTask.value.id, content, boardId)
     selectedTask.value.activity.unshift({
       author: 'You', initial: 'Y', color: 'bg-blue-500', action: '',
       date: new Date().toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
@@ -1106,7 +1424,7 @@ async function handleAddComment() {
     })
     newComment.value = ''
   } catch (e: any) {
-    showToast(e?.response?.data?.error?.message || 'Gagal mengirim komentar.')
+    showToast(apiErrorMessage(e, 'Gagal mengirim komentar.'))
   } finally {
     commentLoading.value = false
   }
@@ -1115,11 +1433,11 @@ async function handleAddComment() {
 async function handleDeleteComment(commentId: string, index: number) {
   if (!commentId) return
   try {
-    await apiDeleteComment(commentId)
+    await apiDeleteComment(commentId, boardId)
     selectedTask.value?.activity.splice(index, 1)
     showToast('Comment deleted.')
   } catch (e: any) {
-    showToast(e?.response?.data?.error?.message || 'Gagal menghapus komentar.')
+    showToast(apiErrorMessage(e, 'Gagal menghapus komentar.'))
   }
 }
 
@@ -1130,7 +1448,7 @@ async function handleUploadFile(event: Event) {
   if (!file || !selectedTask.value?.id) return
   attachFileLoading.value = true
   try {
-    const att = await apiUploadFile(selectedTask.value.id, file)
+    const att = await apiUploadFile(selectedTask.value.id, file, boardId)
     if (!selectedTask.value.attachments) selectedTask.value.attachments = []
     selectedTask.value.attachments.push({
       id: att.id ?? null,
@@ -1141,7 +1459,7 @@ async function handleUploadFile(event: Event) {
     logActivity(`attached file "${file.name}"`)
     showToast(`File "${file.name}" uploaded!`)
   } catch (e: any) {
-    showToast(e?.response?.data?.error?.message || 'Gagal upload file.')
+    showToast(apiErrorMessage(e, 'Gagal upload file.'))
   } finally {
     attachFileLoading.value = false
     input.value = ''
@@ -1154,7 +1472,7 @@ async function handleAddLink() {
   if (!title || !url || !selectedTask.value?.id || attachLinkLoading.value) return
   attachLinkLoading.value = true
   try {
-    await apiAddLink(selectedTask.value.id, title, url)
+    await apiAddLink(selectedTask.value.id, title, url, boardId)
     if (!selectedTask.value.attachments) selectedTask.value.attachments = []
     selectedTask.value.attachments.push({ id: null, title, type: 'link', url })
     logActivity(`attached link "${title}"`)
@@ -1163,7 +1481,7 @@ async function handleAddLink() {
     attachLinkUrl.value = ''
     showAttachLink.value = false
   } catch (e: any) {
-    showToast(e?.response?.data?.error?.message || 'Gagal menambah link.')
+    showToast(apiErrorMessage(e, 'Gagal menambah link.'))
   } finally {
     attachLinkLoading.value = false
   }
@@ -1173,12 +1491,12 @@ async function handleDeleteAttachment(attachId: string | null, index: number) {
   if (!attachId) return
   try {
     const att = selectedTask.value?.attachments?.[index]
-    await apiDeleteAttachment(attachId)
+    await apiDeleteAttachment(attachId, boardId)
     selectedTask.value?.attachments?.splice(index, 1)
     logActivity(`deleted attachment "${att?.title ?? 'file'}"`)
     showToast('Attachment deleted.')
   } catch (e: any) {
-    showToast(e?.response?.data?.error?.message || 'Gagal menghapus attachment.')
+    showToast(apiErrorMessage(e, 'Gagal menghapus attachment.'))
   }
 }
 
