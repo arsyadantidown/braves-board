@@ -11,6 +11,7 @@ from app.api.user.views import router as user_router
 from app.api.time_tracking.views import router as time_tracking_router
 from app.api.log.views import router as log_router
 from app.api.board_member.views import router as board_member_router
+from app.api.notification.views import router as notification_router
 api_router = APIRouter()
 
 api_router.include_router(auth_router)
@@ -24,3 +25,4 @@ api_router.include_router(user_router)
 api_router.include_router(time_tracking_router)
 api_router.include_router(log_router)
 api_router.include_router(board_member_router)
+api_router.include_router(notification_router)
