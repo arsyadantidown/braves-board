@@ -345,10 +345,6 @@
                     <font-awesome-icon :icon="activeTimerTaskId === selectedTask.id ? 'stop' : 'play'" />
                     {{ activeTimerTaskId === selectedTask.id ? 'Stop' : 'Start' }}
                   </button>
-                  <button v-if="activeTimerTaskId === selectedTask.id" @click.stop="handleConfirmTimer(selectedTask.id)"
-                    class="text-xs text-blue-600 border border-blue-200 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition">
-                    Confirm
-                  </button>
                 </div>
               </div>
 
@@ -628,6 +624,30 @@
     </div>
   </Teleport>
 
+  <!-- Delete Card Confirmation -->
+  <Teleport to="body">
+    <div v-if="deleteTaskConfirmOpen" class="fixed inset-0 z-[70] flex items-center justify-center"
+      style="background: rgba(0,0,0,0.65)" @click.self="deleteTaskConfirmOpen = false">
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-5">
+        <p class="text-sm font-semibold text-gray-800 mb-2">Hapus card ini?</p>
+        <p class="text-xs text-gray-500 leading-relaxed mb-5">
+          Card "{{ selectedTask?.title }}" akan dihapus permanen beserta subtask, komentar, dan attachment-nya.
+          Tindakan ini tidak bisa dibatalkan.
+        </p>
+        <div class="flex gap-2 justify-end">
+          <button @click="deleteTaskConfirmOpen = false"
+            class="text-xs text-gray-600 border border-gray-300 rounded-lg px-4 py-2 hover:bg-gray-50 transition">
+            Batal
+          </button>
+          <button @click="confirmDeleteTask"
+            class="text-xs text-white bg-red-500 hover:bg-red-600 rounded-lg px-4 py-2 transition">
+            Ya, hapus
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
   <!-- Toast -->
   <Teleport to="body">
     <Transition name="toast">
@@ -667,7 +687,6 @@ import {
   startTimer as apiStartTimer,
   stopTimer as apiStopTimer,
   pingTimer as apiPingTimer,
-  confirmTimer as apiConfirmTimer,
   getTimerLogs as apiGetTimerLogs,
 } from '../../timer/api/timer.api'
 import {
@@ -765,6 +784,7 @@ const subtaskCreating = ref(false)
 
 // ─── Board Members Panel State ─────────────────────────────────
 const showMembersPanel = ref(false)
+const deleteTaskConfirmOpen = ref(false)
 const membersLoading = ref(false)
 const memberActionLoading = ref(false)
 const newMemberUserId = ref('')
@@ -1142,15 +1162,6 @@ async function doStopTimer(taskId: string) {
   }
 }
 
-async function handleConfirmTimer(taskId: string) {
-  try {
-    await apiConfirmTimer(taskId, boardId)
-    showToast('Timer confirmed ✓')
-  } catch (e: any) {
-    showToast(apiErrorMessage(e, 'Gagal konfirmasi timer.'))
-  }
-}
-
 async function loadTimerLogs(taskId: string) {
   if (!taskId) return
   timerLogsLoading.value = true
@@ -1217,11 +1228,18 @@ onMounted(() => {
 })
 onUnmounted(() => { stopTick(); stopPing() })
 // ─── Task Actions ─────────────────────────────────────
-async function handleDeleteTask() {
+function handleDeleteTask() {
+  if (!selectedTask.value) return
+  deleteTaskConfirmOpen.value = true
+}
+
+async function confirmDeleteTask() {
   if (!selectedTask.value) return
   const columnId = selectedTask.value.column_id
+  const taskId = selectedTask.value.id
+  deleteTaskConfirmOpen.value = false
   try {
-    await store.removeTask(selectedTask.value.id, columnId)
+    await store.removeTask(taskId, columnId)
     closeModal()
     showToast('Task deleted.')
   } catch (e: any) {
@@ -1355,11 +1373,18 @@ function toggleColumnMenu(columnId: string) {
 // tidak ada endpoint duplicate/mirror/template, tidak ada field
 // watchers/archived. "Move" juga redundant dengan dropdown column di atas
 // (sudah pindah task antar column lewat PATCH /tasks/{id}/move).
+// "Leave card" = keluar dari assignee_ids card ini saja (bisa masuk lagi
+// kapan saja lewat Add Member) — TIDAK mempengaruhi keanggotaan board.
+const isOnThisCard = computed(() => {
+  const myId = currentUser.value?.id
+  return !!myId && (selectedTask.value?.assignee_ids ?? []).includes(myId)
+})
+
 const ellipsisMenuItems = computed(() => {
   const items: { label: string; action: string; danger: boolean }[] = [
     { label: 'Share', action: 'share', danger: false },
   ]
-  if (canRemoveMember.value) items.push({ label: 'Leave board', action: 'leave', danger: true })
+  if (isOnThisCard.value) items.push({ label: 'Leave card', action: 'leave', danger: true })
   if (canDeleteTask.value) items.push({ label: 'Delete', action: 'delete', danger: true })
   return items
 })
@@ -1367,7 +1392,11 @@ const ellipsisMenuItems = computed(() => {
 function handleEllipsisAction(action: string) {
   ellipsisOpen.value = false
   if (action === 'share') { navigator.clipboard?.writeText(window.location.href).catch(() => { }); showToast('Link copied!'); return }
-  if (action === 'leave') { const myId = currentUser.value?.id; if (myId) removeBoardMember(myId); return }
+  if (action === 'leave') {
+    const myId = currentUser.value?.id
+    if (myId) handleToggleMember(myId)
+    return
+  }
   if (action === 'delete') { handleDeleteTask(); return }
 }
 
@@ -1406,6 +1435,7 @@ function closeModal() {
   timerLogs.value = []
   timerLogsError.value = ''
   timerDescription.value = ''
+  deleteTaskConfirmOpen.value = false
   closeAllDropdowns()
 }
 

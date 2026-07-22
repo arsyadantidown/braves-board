@@ -118,6 +118,7 @@ export const useAppStore = defineStore('app', () => {
         completed: s.is_completed ?? s.completed ?? false,
       })),
       assignee_ids: task.assignee_ids ?? [],
+      labels: task.labels ?? [],
       activity: task.activity ?? [],
       attachments: task.attachments ?? [],
       time: task.time ?? '00:00:00',
