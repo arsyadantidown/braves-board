@@ -16,3 +16,4 @@ class Board(Base):
 
     columns = relationship("Column", back_populates="board")
     members = relationship("BoardMember", back_populates="board")
+    notifications = relationship("Notification", back_populates="board")

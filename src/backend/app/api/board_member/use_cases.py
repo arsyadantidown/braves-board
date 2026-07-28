@@ -6,6 +6,8 @@ from app.api.board_member.schema import (
     BoardMemberUpdate,
     BoardMemberResponse,
 )
+from app.api.exceptions.board_exceptions import BoardNotFoundException
+
 
 class BoardMemberUseCase:
     def __init__(self, repo: BoardMemberRepository):
@@ -15,7 +17,8 @@ class BoardMemberUseCase:
         members = await self.repo.get_all(board_id)
 
         return [
-            BoardMemberResponse.model_validate(member).model_dump(mode="json")
+            BoardMemberResponse.model_validate(member)
+            .model_dump(mode="json")
             for member in members
         ]
 
@@ -30,7 +33,12 @@ class BoardMemberUseCase:
             role=member_in.role,
         )
 
-        return BoardMemberResponse.model_validate(member).model_dump(mode="json")
+        if not member:
+            raise BoardNotFoundException()
+
+        return BoardMemberResponse.model_validate(
+            member
+        ).model_dump(mode="json")
 
     async def update(
         self,
@@ -45,9 +53,11 @@ class BoardMemberUseCase:
         )
 
         if not member:
-            raise ValueError("Member not found")
+            raise BoardNotFoundException()
 
-        return BoardMemberResponse.model_validate(member).model_dump(mode="json")
+        return BoardMemberResponse.model_validate(
+            member
+        ).model_dump(mode="json")
 
     async def delete(
         self,
@@ -60,6 +70,8 @@ class BoardMemberUseCase:
         )
 
         if not deleted:
-            raise ValueError("Member not found")
+            raise BoardNotFoundException()
 
-        return True
+        return {
+            "message": "Member deleted successfully"
+        }

@@ -20,6 +20,7 @@ from app.models.task_attachment_model import TaskAttachment
 from app.models.time_log_model import TimeLog
 from app.models.app_log_model import AppLog
 from app.models.board_member_model import BoardMember
+from app.models.notification_model import Notification
 # from app.models import ... (Nanti Anda perlu mengimpor semua file model Anda di sini agar terdeteksi Alembic)
 
 # this is the Alembic Config object, which provides

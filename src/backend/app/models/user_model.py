@@ -17,3 +17,4 @@ class User(Base):
     deleted_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), index=True, nullable=True)
 
     board_members = relationship("BoardMember", back_populates="user")
+    notifications = relationship("Notification", back_populates="user")

@@ -35,3 +35,4 @@ class Task(Base):
     subtasks: Mapped[list["Subtask"]] = relationship(back_populates="task")
     comments: Mapped[list["TaskComment"]] = relationship(back_populates="task")
     attachments: Mapped[list["TaskAttachment"]] = relationship(back_populates="task")
+    notifications = relationship("Notification", back_populates="task")

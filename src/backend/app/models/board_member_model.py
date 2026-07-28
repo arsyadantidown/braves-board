@@ -1,7 +1,7 @@
 import enum
 import uuid
 
-from sqlalchemy import DateTime, Enum, ForeignKey, UniqueConstraint, func
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -13,57 +13,74 @@ class BoardRole(str, enum.Enum):
     ADMIN = "admin"
     MEMBER = "member"
 
+
 class BoardMember(Base):
     __tablename__ = "board_members"
 
     __table_args__ = (
-        UniqueConstraint("board_id", "user_id", name="uq_board_member"),
+        Index(
+            "uq_board_member_active",
+            "board_id",
+            "user_id",
+            unique=True,
+            postgresql_where="deleted_at IS NULL",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         primary_key=True,
-        server_default=func.gen_random_uuid()
+        server_default=func.gen_random_uuid(),
     )
 
     board_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("boards.id"),
         index=True,
-        nullable=False
+        nullable=False,
     )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id"),
         index=True,
-        nullable=False
+        nullable=False,
     )
 
     role: Mapped[BoardRole] = mapped_column(
-        Enum(BoardRole, name="board_role"),
+        Enum(
+            BoardRole,
+            name="board_role",
+        ),
         nullable=False,
-        default=BoardRole.MEMBER
+        default=BoardRole.MEMBER,
     )
 
     created_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
-        nullable=False
+        nullable=False,
     )
 
     updated_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
         onupdate=func.now(),
-        nullable=False
+        nullable=False,
     )
 
     deleted_at: Mapped[DateTime | None] = mapped_column(
         DateTime(timezone=True),
         index=True,
-        nullable=True
+        nullable=True,
     )
 
-    board = relationship("Board", back_populates="members")
-    user = relationship("User", back_populates="board_members")
+    board = relationship(
+        "Board",
+        back_populates="members",
+    )
+
+    user = relationship(
+        "User",
+        back_populates="board_members",
+    )
