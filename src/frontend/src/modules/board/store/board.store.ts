@@ -1,6 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { getBoards, createBoard as apiCreateBoard, getUsers as apiGetUsers } from '../api/board.api'
+import {
+  getBoards,
+  createBoard as apiCreateBoard,
+  updateBoard as apiUpdateBoard,
+  deleteBoard as apiDeleteBoard,
+  getUsers as apiGetUsers,
+} from '../api/board.api'
 import { getColumns, createColumn as apiCreateColumn } from '../api/column.api'
 import {
   getTasks,
@@ -27,7 +33,11 @@ export const useAppStore = defineStore('app', () => {
   async function fetchBoards(force = false) {
     if (boardsLoaded.value && !force) return
     const res = await getBoards()
-    boards.value = Array.isArray(res) ? res : res.items ?? res.data ?? []
+    // Backend (use_cases.py get_all) balas { boards: [...], meta: {...} } —
+    // bukan res.items/res.data. Fallback lama itu artinya boards.value
+    // selalu jadi [] kalau backend tidak kebetulan mengirim salah satu key
+    // itu. Prioritaskan res.boards dulu.
+    boards.value = Array.isArray(res) ? res : res.boards ?? res.items ?? res.data ?? []
     boardsLoaded.value = true
   }
 
@@ -35,6 +45,19 @@ export const useAppStore = defineStore('app', () => {
     const board = await apiCreateBoard(title)
     boards.value.push(board)
     return board
+  }
+
+  async function renameBoard(boardId: string, title: string) {
+    await apiUpdateBoard(boardId, title)
+    const b = boards.value.find((x: any) => x.id === boardId)
+    if (b) b.title = title
+  }
+
+  async function removeBoard(boardId: string) {
+    await apiDeleteBoard(boardId)
+    boards.value = boards.value.filter((x: any) => x.id !== boardId)
+    delete columnsByBoard.value[boardId]
+    delete boardMembers.value[boardId]
   }
 
   // ─── Users ────────────────────────────────────────────
@@ -84,7 +107,20 @@ export const useAppStore = defineStore('app', () => {
   // ─── Columns ──────────────────────────────────────────
   const columnsByBoard = ref<Record<string, any[]>>({})
 
+  // Board yang sudah ketahuan 403 (bukan member lagi / akses dicabut).
+  // Sengaja TIDAK di-persist (lihat pick di bawah) — kalau user diundang
+  // lagi nanti, refresh halaman akan coba ulang secara wajar.
+  const blockedBoardIds = ref<Set<string>>(new Set())
+
   async function fetchColumns(boardId: string, force = false) {
+    if (blockedBoardIds.value.has(boardId)) {
+      // Board sudah ketahuan tidak bisa diakses — jangan tembak endpoint
+      // lagi (dulu ini yang bikin GET /columns?board_id=... 403 berulang
+      // tanpa henti tiap Dashboard/TimeTracker mount, karena boards.value
+      // hasil persist localStorage masih menyimpan board yang aksesnya
+      // sudah dicabut, dan fetch yang gagal tidak pernah ke-cache).
+      throw new Error('BOARD_ACCESS_BLOCKED')
+    }
     if (columnsByBoard.value[boardId] && !force) return
     try {
       const cols = await getColumns(boardId)
@@ -93,8 +129,13 @@ export const useAppStore = defineStore('app', () => {
         title: col.title,
         tasks: normalizeTaskList(col.tasks ?? []),
       }))
-    } catch (e) {
+    } catch (e: any) {
       console.error('fetchColumns RAW error:', e)
+      if (e?.response?.status === 403) {
+        blockedBoardIds.value.add(boardId)
+        delete columnsByBoard.value[boardId]
+        boards.value = boards.value.filter((b: any) => b.id !== boardId)
+      }
       throw e
     }
   }
@@ -301,11 +342,11 @@ export const useAppStore = defineStore('app', () => {
   }
 
   return {
-    boards, boardsLoaded, fetchBoards, addBoard,
+    boards, boardsLoaded, fetchBoards, addBoard, renameBoard, removeBoard,
     users, usersLoaded, fetchUsers,
     boardMembers, fetchBoardMembers,
     addBoardMemberToStore, updateBoardMemberRoleInStore, removeBoardMemberFromStore, getMyRole,
-    columnsByBoard, fetchColumns, addColumn,
+    columnsByBoard, fetchColumns, addColumn, blockedBoardIds,
     findBoardIdForColumn, findBoardIdForTask,
     fetchTasks, addTask, editTask, removeTask, moveTaskToColumn, addSubtask, toggleSubtask, renameSubtask, removeSubtask,
   }

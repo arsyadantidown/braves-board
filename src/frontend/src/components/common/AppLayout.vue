@@ -12,9 +12,7 @@
         <button class="w-8 h-8 flex items-center justify-center rounded-full border border-gray-300 hover:bg-gray-50 transition text-gray-600">
           <font-awesome-icon icon="question" class="text-sm" />
         </button>
-        <button class="w-8 h-8 flex items-center justify-center rounded-full border border-gray-300 hover:bg-gray-50 transition text-gray-600">
-          <font-awesome-icon icon="bell" class="text-sm" />
-        </button>
+        <NotificationBell />
         <button class="w-8 h-8 flex items-center justify-center rounded-full border border-gray-300 hover:bg-gray-50 transition text-gray-600">
           <font-awesome-icon icon="user" class="text-sm" />
         </button>
@@ -35,8 +33,9 @@
 <script setup lang="ts">
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { library } from '@fortawesome/fontawesome-svg-core'
-import { faQuestion, faBell, faUser } from '@fortawesome/free-solid-svg-icons'
+import { faQuestion, faUser } from '@fortawesome/free-solid-svg-icons'
 import AppSidebar from './AppSidebar.vue'
+import NotificationBell from '../../modules/notification/components/NotificationBell.vue'
 
-library.add(faQuestion, faBell, faUser)
+library.add(faQuestion, faUser)
 </script>

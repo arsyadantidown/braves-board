@@ -34,6 +34,7 @@
         <label class="block text-[11px] text-gray-400 mb-1">Rentang tanggal</label>
         <select v-model="datePreset"
           class="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-400 transition bg-white">
+          <option value="all">Semua waktu</option>
           <option value="today">Hari ini</option>
           <option value="week">Minggu ini</option>
           <option value="month">Bulan ini</option>
@@ -191,7 +192,10 @@ function showToast(msg: string) {
 
 // ─── Filters ────────────────────────────────────────────────────
 const filterBoardId = ref('')
-const datePreset = ref<DateRangePreset>('week')
+// Default 'all' — sebelumnya default 'week' diam-diam menyembunyikan
+// riwayat lebih lama dari 7 hari (ini penyebab laporan "riwayat Juli tidak
+// muncul": datanya ada, cuma ke-filter default).
+const datePreset = ref<DateRangePreset>('all')
 const customStart = ref('')
 const customEnd = ref('')
 const filterTag = ref('')

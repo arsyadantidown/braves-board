@@ -2,7 +2,14 @@
   <Layout>
     <!-- Board Header -->
     <div class="flex items-center justify-between mb-4 px-1">
-      <h1 class="text-lg font-bold text-gray-800">{{ currentBoard?.title ?? 'Board' }}</h1>
+      <div class="flex items-center gap-3 min-w-0">
+        <button @click="router.push('/boards')"
+          class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-200 text-gray-500 transition flex-shrink-0"
+          title="Kembali ke daftar board">
+          <font-awesome-icon icon="arrow-left" />
+        </button>
+        <h1 class="text-lg font-bold text-gray-800 truncate">{{ currentBoard?.title ?? 'Board' }}</h1>
+      </div>
       <div class="flex items-center gap-2">
         <div class="flex items-center -space-x-2">
           <div v-for="m in resolveMembers(boardMemberUserIds).slice(0, 5)" :key="m.id"
@@ -674,7 +681,7 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import {
   faClock, faPlay, faStop, faPlus, faTag, faCheckSquare, faPaperclip,
-  faAlignLeft, faEye, faImage, faEllipsisH, faTimes, faCommentAlt, faCheck, faUsers,
+  faAlignLeft, faEye, faImage, faEllipsisH, faTimes, faCommentAlt, faCheck, faUsers, faArrowLeft,
 } from '@fortawesome/free-solid-svg-icons'
 import {
   addComment as apiAddComment,
@@ -737,7 +744,7 @@ interface Task {
   labelClass?: string
 }
 
-library.add(faClock, faPlay, faStop, faPlus, faTag, faCheckSquare, faPaperclip, faAlignLeft, faEye, faImage, faEllipsisH, faTimes, faCommentAlt, faCheck, faUsers)
+library.add(faClock, faPlay, faStop, faPlus, faTag, faCheckSquare, faPaperclip, faAlignLeft, faEye, faImage, faEllipsisH, faTimes, faCommentAlt, faCheck, faUsers, faArrowLeft)
 
 const route = useRoute()
 const router = useRouter()
@@ -856,9 +863,14 @@ const canRemoveMember = computed(() => hasPermission(myBoardRole.value, 'member.
 const canChangeMemberRole = computed(() => hasPermission(myBoardRole.value, 'member.change_role'))
 const addableUsers = computed(() => users.value.filter((u: any) => !boardMemberUserIds.value.includes(u.id)))
 
-// Backend TIDAK punya proteksi "jangan hapus/demote owner terakhir" sama
-// sekali (board_member/repository.py soft_delete & update tidak ada
-// pengecekan role apapun) — ini murni safety-net di frontend.
+// Update: backend sekarang MENOLAK soft_delete() owner terakhir
+// (board_member/repository.py — cek count_owners <= 1), tapi errornya pakai
+// BoardNotFoundException (404 "Board tidak ditemukan") — pesan yang
+// membingungkan untuk aksi hapus member. Guard di frontend ini dipertahankan
+// supaya user dapat feedback instan tanpa round-trip, DAN supaya pesan error
+// yang ditampilkan jelas (bukan "Board tidak ditemukan" mentah-mentah) kalau
+// tetap kena race condition. Untuk ganti role (update()), backend BELUM
+// punya proteksi apapun — guard di sini masih satu-satunya proteksi.
 const ownerCount = computed(() => boardMemberList.value.filter((m: any) => m.role === 'owner').length)
 
 function isSoleOwner(userId: string): boolean {
@@ -932,6 +944,15 @@ async function removeBoardMember(userId: string) {
     showToast(isSelf ? 'Anda telah keluar dari board.' : 'Member dihapus.')
     if (isSelf) router.replace('/boards')
   } catch (e: any) {
+    // Backend menolak hapus owner terakhir dengan 404 "Board tidak
+    // ditemukan" (BoardNotFoundException dipakai ulang) — bukan 403/400.
+    // Guard di atas seharusnya sudah mencegah ini duluan; kalau tetap
+    // ke-trigger (race condition, data member basi), tampilkan pesan yang
+    // masuk akal, bukan "Board tidak ditemukan" mentah yang membingungkan.
+    if (e?.response?.status === 404) {
+      showToast('Gagal menghapus member — kemungkinan ini satu-satunya owner board ini. Coba refresh dan cek lagi.')
+      return
+    }
     showToast(apiErrorMessage(e, isSelf ? 'Gagal keluar dari board.' : 'Gagal menghapus member.'))
   }
 }
@@ -1197,11 +1218,21 @@ async function initBoards() {
   if (!boardId) { showToast('Board ID tidak ditemukan.'); return }
   try {
     await store.fetchColumns(boardId)
+    openTaskFromQuery()
   } catch (e: any) {
     console.error('fetchColumns error:', e?.response?.status, e?.response?.data)
     showToast('Akses ditolak atau Board tidak ditemukan.')
     router.replace('/boards')
   }
+}
+
+// Dibuka lewat klik notifikasi (?taskId=...) — dari NotificationBell.
+function openTaskFromQuery() {
+  const taskId = route.query.taskId
+  if (!taskId || typeof taskId !== 'string') return
+  const task = findTaskById(taskId)
+  if (task) openModal(task)
+  else showToast('Card tidak ditemukan (mungkin sudah dihapus).')
 }
 
 async function handleCreateBoard() {

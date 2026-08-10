@@ -1,7 +1,7 @@
 // src/modules/timer/utils/date-range.util.ts
 // Preset rentang tanggal untuk filter Time Tracker (Clockify-style).
 
-export type DateRangePreset = 'today' | 'week' | 'month' | 'custom'
+export type DateRangePreset = 'all' | 'today' | 'week' | 'month' | 'custom'
 
 function startOfDay(d: Date): Date {
   const r = new Date(d)
@@ -38,6 +38,12 @@ export interface DateRange {
 export function resolveDateRange(preset: DateRangePreset, customStart?: string, customEnd?: string): DateRange {
   const now = new Date()
 
+  if (preset === 'all') {
+    // Rentang seluas mungkin — jangan pakai now() sebagai batas atas,
+    // supaya entry manapun (termasuk yang ke-timestamp di masa depan karena
+    // jam server/klien beda) tetap ikut kehitung.
+    return { start: new Date(0), end: new Date(8640000000000000) }
+  }
   if (preset === 'today') {
     return { start: startOfDay(now), end: endOfDay(now) }
   }

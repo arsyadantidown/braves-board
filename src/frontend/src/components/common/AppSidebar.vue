@@ -3,12 +3,12 @@
     <nav class="flex-1 py-4 px-3 flex flex-col gap-4">
       <!-- MENU -->
       <RouterLink v-for="menu in menus" :key="menu.path" :to="menu.path"
-        class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-150" :class="$route.path === menu.path
+        class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-150" :class="isActive(menu.path)
           ? 'bg-blue-600 text-white'
           : 'text-gray-600 hover:bg-gray-100 hover:text-gray-800'
           ">
         <font-awesome-icon :icon="menu.icon" class="w-4 h-4"
-          :class="$route.path === menu.path ? 'text-white' : 'text-gray-500'" />
+          :class="isActive(menu.path) ? 'text-white' : 'text-gray-500'" />
         <span>{{ menu.name }}</span>
       </RouterLink>
     </nav>
@@ -25,7 +25,7 @@
 </template>
 
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import {
@@ -41,6 +41,14 @@ import type { MenuItem } from '../../app/types/app.type'
 import api from '../../app/api'
 
 const router = useRouter()
+const route = useRoute()
+
+// Cocokkan juga sub-path (mis. /boards/:boardId) supaya menu "Boards" tetap
+// aktif saat masuk ke board tertentu / buka detail card — sebelumnya cuma
+// exact-match ke /boards jadi status aktif hilang begitu pindah ke board.
+function isActive(path: string): boolean {
+  return route.path === path || route.path.startsWith(`${path}/`)
+}
 
 library.add(
   faTachometerAlt,
