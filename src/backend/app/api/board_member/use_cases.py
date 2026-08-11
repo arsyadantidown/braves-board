@@ -8,7 +8,6 @@ from app.api.board_member.schema import (
 )
 from app.api.exceptions.board_exceptions import BoardNotFoundException
 
-
 class BoardMemberUseCase:
     def __init__(self, repo: BoardMemberRepository):
         self.repo = repo
@@ -17,8 +16,7 @@ class BoardMemberUseCase:
         members = await self.repo.get_all(board_id)
 
         return [
-            BoardMemberResponse.model_validate(member)
-            .model_dump(mode="json")
+            BoardMemberResponse.model_validate(member).model_dump(mode="json")
             for member in members
         ]
 

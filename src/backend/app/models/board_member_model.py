@@ -1,7 +1,7 @@
 import enum
 import uuid
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, func
+from sqlalchemy import DateTime, Enum, ForeignKey, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -18,13 +18,7 @@ class BoardMember(Base):
     __tablename__ = "board_members"
 
     __table_args__ = (
-        Index(
-            "uq_board_member_active",
-            "board_id",
-            "user_id",
-            unique=True,
-            postgresql_where="deleted_at IS NULL",
-        ),
+        UniqueConstraint("board_id", "user_id", name="uq_board_member"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -48,10 +42,7 @@ class BoardMember(Base):
     )
 
     role: Mapped[BoardRole] = mapped_column(
-        Enum(
-            BoardRole,
-            name="board_role",
-        ),
+        Enum(BoardRole, name="board_role"),
         nullable=False,
         default=BoardRole.MEMBER,
     )

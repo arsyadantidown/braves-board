@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Sequence
 
-from sqlalchemy import select, update, func
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.board_member_model import BoardMember, BoardRole
@@ -17,7 +17,6 @@ class BoardMemberRepository:
         board_id: uuid.UUID,
         user_id: uuid.UUID,
     ) -> BoardMember | None:
-
         stmt = (
             select(BoardMember)
             .where(
@@ -30,13 +29,11 @@ class BoardMemberRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
-
     async def get_member_include_deleted(
         self,
         board_id: uuid.UUID,
         user_id: uuid.UUID,
     ) -> BoardMember | None:
-
         stmt = (
             select(BoardMember)
             .where(
@@ -48,13 +45,11 @@ class BoardMemberRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
-
     async def get_role(
         self,
         board_id: uuid.UUID,
         user_id: uuid.UUID,
     ) -> BoardRole | None:
-
         stmt = (
             select(BoardMember.role)
             .where(
@@ -68,12 +63,10 @@ class BoardMemberRepository:
 
         return result.scalar_one_or_none()
 
-
     async def get_all(
         self,
         board_id: uuid.UUID,
     ) -> Sequence[BoardMember]:
-
         stmt = (
             select(BoardMember)
             .where(
@@ -87,12 +80,10 @@ class BoardMemberRepository:
 
         return result.scalars().all()
 
-
     async def count_owners(
         self,
         board_id: uuid.UUID,
     ) -> int:
-
         stmt = (
             select(func.count())
             .select_from(BoardMember)
@@ -107,23 +98,18 @@ class BoardMemberRepository:
 
         return result.scalar_one()
 
-
     async def create(
         self,
         board_id: uuid.UUID,
         user_id: uuid.UUID,
         role: BoardRole = BoardRole.MEMBER,
     ) -> BoardMember:
-
-
         existing = await self.get_member_include_deleted(
             board_id,
             user_id,
         )
 
-
         if existing:
-
             existing.role = role
             existing.deleted_at = None
             existing.updated_at = datetime.now(timezone.utc)
@@ -132,7 +118,6 @@ class BoardMemberRepository:
             await self.session.refresh(existing)
 
             return existing
-
 
         db_member = BoardMember(
             board_id=board_id,
@@ -147,14 +132,12 @@ class BoardMemberRepository:
 
         return db_member
 
-
     async def update(
         self,
         board_id: uuid.UUID,
         user_id: uuid.UUID,
         role: BoardRole,
     ) -> BoardMember | None:
-
         stmt = (
             update(BoardMember)
             .where(
@@ -170,18 +153,15 @@ class BoardMemberRepository:
         )
 
         result = await self.session.execute(stmt)
-
         await self.session.commit()
 
         return result.scalar_one_or_none()
-
 
     async def soft_delete(
         self,
         board_id: uuid.UUID,
         user_id: uuid.UUID,
     ) -> bool:
-
         member = await self.get_member(
             board_id,
             user_id,
@@ -190,7 +170,7 @@ class BoardMemberRepository:
         if not member:
             return False
 
-        # jangan sampai owner terakhir hilang
+        # Jangan sampai owner terakhir hilang
         if member.role == BoardRole.OWNER:
             owner_count = await self.count_owners(board_id)
 
