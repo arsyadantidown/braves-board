@@ -32,6 +32,7 @@ class Task(Base):
     updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     deleted_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), index=True, nullable=True)
 
+    column = relationship("Column", back_populates="tasks")
     subtasks: Mapped[list["Subtask"]] = relationship(back_populates="task")
     comments: Mapped[list["TaskComment"]] = relationship(back_populates="task")
     attachments: Mapped[list["TaskAttachment"]] = relationship(back_populates="task")

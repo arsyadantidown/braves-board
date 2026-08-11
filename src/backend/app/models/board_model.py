@@ -56,3 +56,8 @@ class Board(Base):
         "BoardMember",
         back_populates="board",
     )
+
+    notifications = relationship(
+        "Notification",
+        back_populates="board",
+    )

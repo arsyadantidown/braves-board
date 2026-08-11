@@ -18,7 +18,17 @@ class TaskRepository:
         self.session = session
 
     async def get_by_id(self, task_id: uuid.UUID) -> Task | None:
-        stmt = select(Task).where(Task.id == task_id, Task.deleted_at.is_(None))
+        stmt = (
+            select(Task)
+            .options(
+                selectinload(Task.column)
+            )
+            .where(
+                Task.id == task_id,
+                Task.deleted_at.is_(None)
+            )
+        )
+
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -129,12 +139,17 @@ class TaskRepository:
         stmt = (
             select(Task)
             .options(
+                selectinload(Task.column),
                 selectinload(Task.subtasks.and_(Subtask.deleted_at.is_(None))),
                 selectinload(Task.comments.and_(TaskComment.deleted_at.is_(None)))
-                .joinedload(TaskComment.user), # Load data user di sini
+                .joinedload(TaskComment.user),
                 selectinload(Task.attachments)
             )
-            .where(Task.id == task_id, Task.deleted_at.is_(None))
+            .where(
+                Task.id == task_id,
+                Task.deleted_at.is_(None)
+            )
         )
+
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()

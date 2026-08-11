@@ -111,7 +111,11 @@ async def google_callback(
 
         return redirect_response
 
-    except Exception:
+    except Exception as e:
+        import traceback
+        print(f"GOOGLE AUTH ERROR: {e}")
+        traceback.print_exc()
+
         return RedirectResponse(
             url=f"{settings.FRONTEND_URL}/?error=google_auth_failed"
         )

@@ -20,3 +20,4 @@ class Column(Base):
     deleted_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), index=True, nullable=True)
 
     board = relationship("Board", back_populates="columns")
+    tasks = relationship("Task", back_populates="column")

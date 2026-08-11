@@ -63,3 +63,8 @@ class User(Base):
         "BoardMember",
         back_populates="user",
     )
+
+    notifications = relationship(
+        "Notification",
+        back_populates="user",
+    )
