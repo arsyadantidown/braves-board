@@ -65,6 +65,34 @@ async def get_task_detail(
     return success_response(result)
 
 
+@router.patch("/{task_id}/archive", status_code=status.HTTP_200_OK)
+async def archive_task(
+    task_id: uuid.UUID,
+    use_case: TaskUseCase = Depends(get_task_use_case),
+    current_user: User = Depends(
+        require_permission("task.archive")
+    ),
+):
+    result = await use_case.archive_task(
+        task_id
+    )
+    return success_response(result)
+
+
+@router.patch("/{task_id}/unarchive", status_code=status.HTTP_200_OK)
+async def unarchive_task(
+    task_id: uuid.UUID,
+    use_case: TaskUseCase = Depends(get_task_use_case),
+    current_user: User = Depends(
+        require_permission("task.archive")
+    ),
+):
+    result = await use_case.unarchive_task(
+        task_id
+    )
+    return success_response(result)
+
+
 @router.patch("/{task_id}", status_code=status.HTTP_200_OK)
 async def update_task(
     task_id: uuid.UUID,

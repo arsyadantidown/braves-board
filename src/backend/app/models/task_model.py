@@ -22,6 +22,8 @@ class Task(Base):
     position: Mapped[int] = mapped_column(Integer, nullable=False)
 
     is_timer_running: Mapped[bool] = mapped_column(Boolean, server_default="false", index=True, nullable=False)
+    is_completed: Mapped[bool] = mapped_column(Boolean, server_default="false", index=True, nullable=False)
+    is_archived: Mapped[bool] = mapped_column(Boolean, server_default="false", index=True, nullable=False)
 
     start_time: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     total_duration: Mapped[int] = mapped_column(Integer, server_default="0", nullable=False)

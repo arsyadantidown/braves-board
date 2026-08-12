@@ -83,6 +83,12 @@ PERMISSIONS = {
         BoardRole.MEMBER,
     },
 
+    "task.archive": {
+        BoardRole.OWNER,
+        BoardRole.ADMIN,
+        BoardRole.MEMBER,
+    },   
+
     "task.delete": {
         BoardRole.OWNER,
         BoardRole.ADMIN,
