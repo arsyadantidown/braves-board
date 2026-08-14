@@ -1,26 +1,26 @@
 <template>
   <AppLayout>
     <div class="mb-8">
-      <h1 class="text-2xl font-bold text-gray-800">Dashboard</h1>
-      <p class="text-sm text-gray-500 mt-1">Welcome back, {{ currentUser?.full_name ?? currentUser?.email ?? '...' }}</p>
+      <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Dashboard</h1>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Welcome back, {{ currentUser?.full_name ?? currentUser?.email ?? '...' }}</p>
     </div>
 
     <!-- Stats -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-      <div class="bg-white rounded-xl border border-gray-200 p-4">
-        <p class="text-xs text-gray-400 mb-1">Total Boards</p>
-        <p class="text-2xl font-bold text-gray-800">{{ boards.length }}</p>
+      <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+        <p class="text-xs text-gray-400 dark:text-gray-500 mb-1">Total Boards</p>
+        <p class="text-2xl font-bold text-gray-800 dark:text-gray-100">{{ boards.length }}</p>
       </div>
-      <div class="bg-white rounded-xl border border-gray-200 p-4">
-        <p class="text-xs text-gray-400 mb-1">My Tasks</p>
-        <p class="text-2xl font-bold text-gray-800">{{ myTasks.length }}</p>
+      <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+        <p class="text-xs text-gray-400 dark:text-gray-500 mb-1">My Tasks</p>
+        <p class="text-2xl font-bold text-gray-800 dark:text-gray-100">{{ myTasks.length }}</p>
       </div>
-      <div class="bg-white rounded-xl border border-gray-200 p-4">
-        <p class="text-xs text-gray-400 mb-1">Completed</p>
+      <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+        <p class="text-xs text-gray-400 dark:text-gray-500 mb-1">Completed</p>
         <p class="text-2xl font-bold text-emerald-500">{{ completedCount }}</p>
       </div>
-      <div class="bg-white rounded-xl border border-gray-200 p-4">
-        <p class="text-xs text-gray-400 mb-1">This Week</p>
+      <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+        <p class="text-xs text-gray-400 dark:text-gray-500 mb-1">This Week</p>
         <p class="text-2xl font-bold text-blue-500">
           {{ weeklyTimeLoading ? '…' : formatTimer(weeklySeconds) }}
         </p>
@@ -30,24 +30,24 @@
     <!-- My Tasks -->
     <div class="mb-8">
       <div class="flex items-center justify-between mb-4">
-        <h2 class="text-sm font-semibold text-gray-700">My Tasks</h2>
-        <span class="text-xs text-gray-400">Card yang meng-assign Anda</span>
+        <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-200">My Tasks</h2>
+        <span class="text-xs text-gray-400 dark:text-gray-500">Card yang meng-assign Anda</span>
       </div>
 
-      <div v-if="tasksLoading" class="bg-white rounded-xl border border-gray-200 p-8 text-center text-sm text-gray-400">
+      <div v-if="tasksLoading" class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-8 text-center text-sm text-gray-400 dark:text-gray-500">
         Memuat task…
       </div>
       <div v-else-if="!myTasks.length"
-        class="bg-white rounded-xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-400">
+        class="bg-white dark:bg-gray-800 rounded-xl border border-dashed border-gray-300 dark:border-gray-600 p-8 text-center text-sm text-gray-400 dark:text-gray-500">
         Belum ada task yang di-assign ke Anda.
       </div>
-      <div v-else class="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100 overflow-hidden">
+      <div v-else class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700 overflow-hidden">
         <router-link v-for="t in myTasks" :key="t.id" :to="`/boards/${t.boardId}`"
-          class="flex items-center gap-4 px-4 py-3 hover:bg-gray-50 transition">
+          class="flex items-center gap-4 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
           <div class="flex-1 min-w-0">
-            <p class="text-sm text-gray-800 font-medium truncate">{{ t.title }}</p>
+            <p class="text-sm text-gray-800 dark:text-gray-100 font-medium truncate">{{ t.title }}</p>
             <div class="flex items-center gap-2 mt-1 flex-wrap">
-              <span class="text-[11px] text-gray-400">{{ t.boardTitle }} • {{ t.columnTitle }}</span>
+              <span class="text-[11px] text-gray-400 dark:text-gray-500">{{ t.boardTitle }} • {{ t.columnTitle }}</span>
               <span v-if="t.dueDate && t.dueDate !== '-' && dueDateStatus(t.dueDate) !== 'normal'"
                 class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
                 :class="dueDateBadgeClass(dueDateStatus(t.dueDate))">
@@ -62,23 +62,23 @@
               <span class="text-[10px] text-gray-400">{{ t.subtaskDone }}/{{ t.subtaskTotal }}</span>
               <span class="text-[10px] font-semibold text-gray-500">{{ t.progress }}%</span>
             </div>
-            <div class="bg-gray-200 rounded-full h-1.5">
+            <div class="bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
               <div class="h-1.5 rounded-full transition-all"
                 :class="t.progress === 100 ? 'bg-emerald-500' : 'bg-blue-500'"
                 :style="{ width: t.progress + '%' }"></div>
             </div>
           </div>
-          <span v-else class="w-32 flex-shrink-0 text-[10px] text-gray-300 text-right">No subtasks</span>
+          <span v-else class="w-32 flex-shrink-0 text-[10px] text-gray-300 dark:text-gray-600 text-right">No subtasks</span>
         </router-link>
       </div>
     </div>
 
     <!-- Quick actions -->
     <div>
-      <h2 class="text-sm font-semibold text-gray-700 mb-4">Quick Actions</h2>
+      <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-4">Quick Actions</h2>
       <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
         <router-link to="/boards"
-          class="bg-white rounded-xl border border-gray-200 p-4 hover:border-blue-400 hover:shadow-sm transition flex items-center gap-3">
+          class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:border-blue-400 hover:shadow-sm transition flex items-center gap-3">
           <div class="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
             <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -86,13 +86,13 @@
             </svg>
           </div>
           <div>
-            <p class="text-sm font-medium text-gray-700">Boards</p>
-            <p class="text-xs text-gray-400">Manage your boards</p>
+            <p class="text-sm font-medium text-gray-700 dark:text-gray-200">Boards</p>
+            <p class="text-xs text-gray-400 dark:text-gray-500">Manage your boards</p>
           </div>
         </router-link>
 
         <router-link to="/tracker"
-          class="bg-white rounded-xl border border-gray-200 p-4 hover:border-blue-400 hover:shadow-sm transition flex items-center gap-3">
+          class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:border-blue-400 hover:shadow-sm transition flex items-center gap-3">
           <div class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
             <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -100,13 +100,13 @@
             </svg>
           </div>
           <div>
-            <p class="text-sm font-medium text-gray-700">Time Tracker</p>
-            <p class="text-xs text-gray-400">Track your time</p>
+            <p class="text-sm font-medium text-gray-700 dark:text-gray-200">Time Tracker</p>
+            <p class="text-xs text-gray-400 dark:text-gray-500">Track your time</p>
           </div>
         </router-link>
 
         <router-link to="/reports"
-          class="bg-white rounded-xl border border-gray-200 p-4 hover:border-blue-400 hover:shadow-sm transition flex items-center gap-3">
+          class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:border-blue-400 hover:shadow-sm transition flex items-center gap-3">
           <div class="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center">
             <svg class="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -114,8 +114,8 @@
             </svg>
           </div>
           <div>
-            <p class="text-sm font-medium text-gray-700">Reports</p>
-            <p class="text-xs text-gray-400">View your reports</p>
+            <p class="text-sm font-medium text-gray-700 dark:text-gray-200">Reports</p>
+            <p class="text-xs text-gray-400 dark:text-gray-500">View your reports</p>
           </div>
         </router-link>
       </div>

@@ -9,7 +9,7 @@ export type Permission =
   | 'board.view' | 'board.update' | 'board.delete'
   | 'member.view' | 'member.invite' | 'member.remove' | 'member.change_role'
   | 'column.view' | 'column.create' | 'column.rename' | 'column.move' | 'column.delete'
-  | 'task.view' | 'task.create' | 'task.update' | 'task.delete'
+  | 'task.view' | 'task.create' | 'task.update' | 'task.archive' | 'task.delete'
 
 const PERMISSIONS: Record<Permission, BoardRole[]> = {
   'board.view': ['owner', 'admin', 'member'],
@@ -30,6 +30,7 @@ const PERMISSIONS: Record<Permission, BoardRole[]> = {
   'task.view': ['owner', 'admin', 'member'],
   'task.create': ['owner', 'admin', 'member'],
   'task.update': ['owner', 'admin', 'member'],
+  'task.archive': ['owner', 'admin', 'member'],
   'task.delete': ['owner', 'admin'],
 }
 

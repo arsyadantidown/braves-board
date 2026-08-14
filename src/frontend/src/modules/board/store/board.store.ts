@@ -14,6 +14,8 @@ import {
   deleteTask as apiDeleteTask,
   updateTask as apiUpdateTask,
   moveTask as apiMoveTask,
+  archiveTask as apiArchiveTask,
+  unarchiveTask as apiUnarchiveTask,
 } from '../api/task.api'
 import { createSubtask as apiCreateSubtask, updateSubtask as apiUpdateSubtask, deleteSubtask as apiDeleteSubtask, completeSubtask as apiCompleteSubtask } from '../api/subtask.api'
 import {
@@ -107,6 +109,15 @@ export const useAppStore = defineStore('app', () => {
   // ─── Columns ──────────────────────────────────────────
   const columnsByBoard = ref<Record<string, any[]>>({})
 
+  // Task yang di-archive per board. Backend MENYEMBUNYIKAN task archived dari
+  // semua endpoint list (get_all_by_column_id* & get_all_by_board_id memfilter
+  // is_archived=False) dan TIDAK punya endpoint untuk melist task archived.
+  // Jadi daftar ini dipertahankan di sisi client (di-persist ke localStorage)
+  // supaya panel "Archived" tetap bisa menampilkan + meng-unarchive dalam sesi
+  // maupun setelah reload. Lihat catatan spesifikasi backend untuk endpoint
+  // list-archived yang dibutuhkan agar sinkron lintas device.
+  const archivedByBoard = ref<Record<string, any[]>>({})
+
   // Board yang sudah ketahuan 403 (bukan member lagi / akses dicabut).
   // Sengaja TIDAK di-persist (lihat pick di bawah) — kalau user diundang
   // lagi nanti, refresh halaman akan coba ulang secara wajar.
@@ -168,6 +179,8 @@ export const useAppStore = defineStore('app', () => {
       labelClass: task.labelClass ?? null,
       description: task.description ?? '',
       status: task.status ?? 'To Do',
+      is_completed: task.is_completed ?? false,
+      is_archived: task.is_archived ?? false,
       column_id: task.column_id ?? columnId ?? null,
     }
   }
@@ -250,6 +263,40 @@ export const useAppStore = defineStore('app', () => {
     await apiDeleteTask(taskId, boardId)
     const col = findColById(columnId)
     if (col) col.tasks = col.tasks.filter((t: any) => t.id !== taskId)
+  }
+
+  async function archiveTaskInStore(taskId: string) {
+    const boardId = findBoardIdForTask(taskId)
+    if (!boardId) throw new Error('Board tidak ditemukan untuk task ini.')
+    await apiArchiveTask(taskId, boardId)
+    const found = findTaskInStore(taskId)
+    if (found) {
+      const [task] = found.col.tasks.splice(found.idx, 1)
+      task.is_archived = true
+      // Simpan judul column asal supaya bisa ditampilkan di panel Archived.
+      task._archivedFromColumnTitle = found.col.title
+      task._archivedFromColumnId = found.col.id
+      if (!archivedByBoard.value[boardId]) archivedByBoard.value[boardId] = []
+      archivedByBoard.value[boardId].unshift(task)
+    }
+  }
+
+  async function unarchiveTaskInStore(taskId: string, boardId: string) {
+    await apiUnarchiveTask(taskId, boardId)
+    const list = archivedByBoard.value[boardId] ?? []
+    const idx = list.findIndex((t: any) => t.id === taskId)
+    if (idx === -1) return
+    const [task] = list.splice(idx, 1)
+    task.is_archived = false
+    // Kembalikan ke column asalnya kalau masih ada, kalau tidak ke column pertama.
+    const cols = columnsByBoard.value[boardId] ?? []
+    const target = cols.find((c: any) => c.id === task._archivedFromColumnId) ?? cols[0]
+    if (target) {
+      task.column_id = target.id
+      delete task._archivedFromColumnTitle
+      delete task._archivedFromColumnId
+      target.tasks.push(task)
+    }
   }
 
   async function moveTaskToColumn(taskId: string, fromColumnId: string, toColumnId: string) {
@@ -347,6 +394,7 @@ export const useAppStore = defineStore('app', () => {
     boardMembers, fetchBoardMembers,
     addBoardMemberToStore, updateBoardMemberRoleInStore, removeBoardMemberFromStore, getMyRole,
     columnsByBoard, fetchColumns, addColumn, blockedBoardIds,
+    archivedByBoard, archiveTaskInStore, unarchiveTaskInStore,
     findBoardIdForColumn, findBoardIdForTask,
     fetchTasks, addTask, editTask, removeTask, moveTaskToColumn, addSubtask, toggleSubtask, renameSubtask, removeSubtask,
   }
@@ -354,6 +402,6 @@ export const useAppStore = defineStore('app', () => {
   persist: {
     key: 'app-store',
     storage: localStorage,
-    pick: ['boards', 'boardsLoaded', 'columnsByBoard'],
+    pick: ['boards', 'boardsLoaded', 'columnsByBoard', 'archivedByBoard'],
   }
 })

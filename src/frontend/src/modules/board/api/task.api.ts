@@ -29,6 +29,16 @@ export async function deleteTask(taskId: string, boardId: string) {
   await http.delete(`/tasks/${taskId}`, { params: { board_id: boardId } })
 }
 
+export async function archiveTask(taskId: string, boardId: string) {
+  const res = await http.patch(`/tasks/${taskId}/archive`, null, { params: { board_id: boardId } })
+  return res.data?.data ?? res.data
+}
+
+export async function unarchiveTask(taskId: string, boardId: string) {
+  const res = await http.patch(`/tasks/${taskId}/unarchive`, null, { params: { board_id: boardId } })
+  return res.data?.data ?? res.data
+}
+
 export async function moveTask(taskId: string, columnId: string, position: number, boardId: string) {
   const res = await http.patch(`/tasks/${taskId}/move`, {
     column_id: columnId,

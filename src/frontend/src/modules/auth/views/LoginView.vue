@@ -1,11 +1,11 @@
 <template>
-  <div :class="darkMode ? 'dark' : ''">
+  <div>
     <div class="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 transition duration-300">
       <button
-        @click="darkMode = !darkMode"
+        @click="toggleTheme"
         class="absolute top-5 right-5 px-4 py-2 rounded bg-black text-white dark:bg-white dark:text-black"
       >
-        {{ darkMode ? 'Light' : 'Dark' }}
+        {{ isDark ? 'Light' : 'Dark' }}
       </button>
 
       <div class="bg-white dark:bg-gray-800 text-white dark:text-white p-8 rounded-xl">
@@ -35,21 +35,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref } from 'vue'
 import { getGoogleLoginUrl } from '../api/auth.api'
+import { useTheme } from '../../../composables/useTheme'
 
-const darkMode = ref<boolean>(false)
+const { isDark, toggleTheme } = useTheme()
 const isLoading = ref(false)
 const errorMsg = ref<string | null>(null)
-
-onMounted(() => {
-  const saved = localStorage.getItem('theme')
-  if (saved === 'true') darkMode.value = true
-})
-
-watch(darkMode, (val: boolean) => {
-  localStorage.setItem('theme', String(val))
-})
 
 async function handleGoogleLogin() {
   isLoading.value = true

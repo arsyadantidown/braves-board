@@ -1,16 +1,16 @@
 <template>
   <AppLayout>
     <div class="mb-6">
-      <h1 class="text-2xl font-bold text-gray-800">Time Tracker</h1>
-      <p class="text-sm text-gray-500 mt-1">Riwayat waktu kerja dari card yang melibatkan Anda.</p>
+      <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Time Tracker</h1>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Riwayat waktu kerja dari card yang melibatkan Anda.</p>
     </div>
 
     <!-- Active timer bar -->
-    <div v-if="activeTaskId" class="bg-white rounded-2xl shadow-sm border border-emerald-200 mb-6 px-5 py-4 flex items-center gap-4">
+    <div v-if="activeTaskId" class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-emerald-200 dark:border-emerald-700 mb-6 px-5 py-4 flex items-center gap-4">
       <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
       <div class="flex-1 min-w-0">
-        <p class="text-sm font-medium text-gray-800 truncate">{{ activeTaskTitle || 'Task' }}</p>
-        <p class="text-xs text-gray-400">{{ activeBoardTitle }}</p>
+        <p class="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{{ activeTaskTitle || 'Task' }}</p>
+        <p class="text-xs text-gray-400 dark:text-gray-500">{{ activeBoardTitle }}</p>
       </div>
       <span class="text-lg font-mono font-bold text-emerald-600 tabular-nums">{{ formatTimer(elapsed) }}</span>
       <button @click="handleStopActiveTimer" :disabled="stopLoading"
@@ -20,20 +20,20 @@
     </div>
 
     <!-- Filters -->
-    <div class="bg-white rounded-2xl border border-gray-200 shadow-sm mb-6 p-4 flex flex-wrap items-end gap-3">
+    <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm mb-6 p-4 flex flex-wrap items-end gap-3">
       <div class="min-w-[160px]">
-        <label class="block text-[11px] text-gray-400 mb-1">Board</label>
+        <label class="block text-[11px] text-gray-400 dark:text-gray-500 mb-1">Board</label>
         <select v-model="filterBoardId"
-          class="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-400 transition bg-white">
+          class="w-full text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-400 transition bg-white dark:bg-gray-700 dark:text-gray-100">
           <option value="">Semua board</option>
           <option v-for="b in boards" :key="b.id" :value="b.id">{{ b.title }}</option>
         </select>
       </div>
 
       <div class="min-w-[140px]">
-        <label class="block text-[11px] text-gray-400 mb-1">Rentang tanggal</label>
+        <label class="block text-[11px] text-gray-400 dark:text-gray-500 mb-1">Rentang tanggal</label>
         <select v-model="datePreset"
-          class="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-400 transition bg-white">
+          class="w-full text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-400 transition bg-white dark:bg-gray-700 dark:text-gray-100">
           <option value="all">Semua waktu</option>
           <option value="today">Hari ini</option>
           <option value="week">Minggu ini</option>
@@ -44,35 +44,35 @@
 
       <template v-if="datePreset === 'custom'">
         <div>
-          <label class="block text-[11px] text-gray-400 mb-1">Dari</label>
+          <label class="block text-[11px] text-gray-400 dark:text-gray-500 mb-1">Dari</label>
           <input type="date" v-model="customStart"
-            class="text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-400 transition" />
+            class="text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-400 transition bg-white dark:bg-gray-700 dark:text-gray-100" />
         </div>
         <div>
-          <label class="block text-[11px] text-gray-400 mb-1">Sampai</label>
+          <label class="block text-[11px] text-gray-400 dark:text-gray-500 mb-1">Sampai</label>
           <input type="date" v-model="customEnd"
-            class="text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-400 transition" />
+            class="text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-400 transition bg-white dark:bg-gray-700 dark:text-gray-100" />
         </div>
       </template>
 
       <div v-if="availableTags.length" class="min-w-[140px]">
-        <label class="block text-[11px] text-gray-400 mb-1">Tag</label>
+        <label class="block text-[11px] text-gray-400 dark:text-gray-500 mb-1">Tag</label>
         <select v-model="filterTag"
-          class="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-400 transition bg-white">
+          class="w-full text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-400 transition bg-white dark:bg-gray-700 dark:text-gray-100">
           <option value="">Semua tag</option>
           <option v-for="tag in availableTags" :key="tag" :value="tag">{{ tag }}</option>
         </select>
       </div>
 
       <div class="flex-1 min-w-[180px]">
-        <label class="block text-[11px] text-gray-400 mb-1">Cari task</label>
+        <label class="block text-[11px] text-gray-400 dark:text-gray-500 mb-1">Cari task</label>
         <input v-model="searchQuery" type="text" placeholder="Nama task..."
-          class="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-400 transition placeholder-gray-400" />
+          class="w-full text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-400 transition placeholder-gray-400 bg-white dark:bg-gray-700 dark:text-gray-100" />
       </div>
 
       <div class="ml-auto text-right">
-        <p class="text-[11px] text-gray-400 mb-1">Total</p>
-        <p class="text-lg font-bold text-gray-800 font-mono tabular-nums">{{ formatTimer(filteredTotalSeconds) }}</p>
+        <p class="text-[11px] text-gray-400 dark:text-gray-500 mb-1">Total</p>
+        <p class="text-lg font-bold text-gray-800 dark:text-gray-100 font-mono tabular-nums">{{ formatTimer(filteredTotalSeconds) }}</p>
       </div>
     </div>
 
@@ -86,43 +86,43 @@
     </div>
 
     <!-- Empty -->
-    <div v-else-if="!dayGroups.length" class="bg-gray-50 border border-dashed border-gray-300 rounded-2xl p-12 text-center">
+    <div v-else-if="!dayGroups.length" class="bg-gray-50 dark:bg-gray-800 border border-dashed border-gray-300 dark:border-gray-600 rounded-2xl p-12 text-center">
       <font-awesome-icon icon="clock" class="text-3xl text-gray-300 mb-3 block mx-auto" />
-      <p class="text-sm text-gray-500 font-medium">Belum ada time entry</p>
-      <p class="text-xs text-gray-400 mt-1">Mulai timer dari card di Boards untuk mulai tracking.</p>
+      <p class="text-sm text-gray-500 dark:text-gray-400 font-medium">Belum ada time entry</p>
+      <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Mulai timer dari card di Boards untuk mulai tracking.</p>
     </div>
 
     <!-- Log groups -->
     <div v-else class="space-y-4">
-      <div v-for="group in dayGroups" :key="group.key" class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <div class="flex items-center justify-between px-5 py-3 bg-gray-50 border-b border-gray-100">
-          <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ group.heading }}</span>
+      <div v-for="group in dayGroups" :key="group.key" class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+        <div class="flex items-center justify-between px-5 py-3 bg-gray-50 dark:bg-gray-700/40 border-b border-gray-100 dark:border-gray-700">
+          <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{{ group.heading }}</span>
           <div class="flex items-center gap-3">
-            <span class="text-xs text-gray-400">Total</span>
-            <span class="text-sm font-bold text-gray-700 font-mono">{{ formatTimer(group.totalSeconds) }}</span>
+            <span class="text-xs text-gray-400 dark:text-gray-500">Total</span>
+            <span class="text-sm font-bold text-gray-700 dark:text-gray-200 font-mono">{{ formatTimer(group.totalSeconds) }}</span>
           </div>
         </div>
-        <div class="divide-y divide-gray-50">
+        <div class="divide-y divide-gray-50 dark:divide-gray-700/60">
           <div v-for="entry in group.entries" :key="entry.id"
-            class="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition">
+            class="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition">
             <div class="flex-1 min-w-0">
-              <router-link :to="`/boards/${entry.boardId}`" class="text-sm text-gray-800 font-medium truncate block hover:text-blue-600 transition">
+              <router-link :to="`/boards/${entry.boardId}`" class="text-sm text-gray-800 dark:text-gray-100 font-medium truncate block hover:text-blue-600 transition">
                 {{ entry.taskTitle }}
               </router-link>
               <div class="flex items-center gap-1.5 mt-0.5 flex-wrap">
                 <span class="text-xs text-orange-500">{{ entry.boardTitle }} • {{ entry.columnTitle }}</span>
-                <span v-if="entry.activityDescription" class="text-xs text-gray-400 truncate">— {{ entry.activityDescription }}</span>
+                <span v-if="entry.activityDescription" class="text-xs text-gray-400 dark:text-gray-500 truncate">— {{ entry.activityDescription }}</span>
                 <span v-if="formatStopReason(entry.stopReason)"
                   class="text-[10px] font-medium text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-1.5 py-0.5">
                   {{ formatStopReason(entry.stopReason) }}
                 </span>
               </div>
             </div>
-            <div class="flex items-center gap-1.5 text-xs text-gray-400 min-w-[120px] justify-center flex-shrink-0">
+            <div class="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500 min-w-[120px] justify-center flex-shrink-0">
               <font-awesome-icon icon="calendar" class="text-gray-300" />
               <span>{{ entry.stopTime ? `${formatClock(entry.startTime)} – ${formatClock(entry.stopTime)}` : `${formatClock(entry.startTime)} – berjalan` }}</span>
             </div>
-            <span class="text-sm font-mono font-semibold text-gray-700 min-w-[70px] text-right flex-shrink-0">
+            <span class="text-sm font-mono font-semibold text-gray-700 dark:text-gray-200 min-w-[70px] text-right flex-shrink-0">
               {{ entry.durationSeconds != null ? formatTimer(entry.durationSeconds) : '—' }}
             </span>
           </div>
@@ -131,7 +131,7 @@
     </div>
 
     <!-- Gap notice: backend belum expose endpoint update/delete time log -->
-    <p class="text-xs text-gray-400 mt-6 text-center">
+    <p class="text-xs text-gray-400 dark:text-gray-500 mt-6 text-center">
       Riwayat waktu di halaman ini read-only — backend belum menyediakan endpoint untuk mengubah atau menghapus entry yang sudah tercatat.
     </p>
 
@@ -232,6 +232,7 @@ async function handleStopActiveTimer() {
     localStorage.removeItem('active_timer_task_id')
     localStorage.removeItem('active_timer_task_title')
     localStorage.removeItem('active_timer_board_id')
+    localStorage.removeItem('active_timer_started_at')
     activeTaskId.value = null
     activeTaskTitle.value = null
     activeBoardId.value = null

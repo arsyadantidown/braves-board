@@ -8,7 +8,7 @@
           title="Kembali ke daftar board">
           <font-awesome-icon icon="arrow-left" />
         </button>
-        <h1 class="text-lg font-bold text-gray-800 truncate">{{ currentBoard?.title ?? 'Board' }}</h1>
+        <h1 class="text-lg font-bold text-gray-800 dark:text-gray-100 truncate">{{ currentBoard?.title ?? 'Board' }}</h1>
       </div>
       <div class="flex items-center gap-2">
         <div class="flex items-center -space-x-2">
@@ -16,8 +16,14 @@
             class="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white border-2 border-white"
             :class="m.color" :title="m.name">{{ m.initial }}</div>
         </div>
+        <button @click="showArchivedPanel = true"
+          class="flex items-center gap-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition">
+          <font-awesome-icon icon="box-archive" /> Archived
+          <span v-if="archivedTasks.length"
+            class="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 rounded-full px-1.5">{{ archivedTasks.length }}</span>
+        </button>
         <button @click="openMembersPanel"
-          class="flex items-center gap-1.5 text-xs border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 text-gray-600 transition">
+          class="flex items-center gap-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition">
           <font-awesome-icon icon="users" /> Members
         </button>
       </div>
@@ -29,18 +35,18 @@
       <VueDraggable v-model="columnsByBoard[boardId]" :animation="150" ghost-class="opacity-40"
         chosen-class="shadow-lg" handle=".column-drag-handle" class="flex gap-3" @end="onColumnDragEnd">
         <div v-for="board in columnsByBoard[boardId]" :key="board.id"
-          class="min-w-[260px] max-w-[260px] flex flex-col rounded-xl border border-gray-200 bg-gray-50"
+          class="min-w-[260px] max-w-[260px] flex flex-col rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60"
           style="max-height: calc(100vh - 120px)">
 
           <!-- Column Header -->
-          <div class="flex items-center justify-between px-3 py-2.5 border-b border-gray-200">
+          <div class="flex items-center justify-between px-3 py-2.5 border-b border-gray-200 dark:border-gray-700">
             <div class="column-drag-handle flex items-center gap-2 flex-1 min-w-0 cursor-grab active:cursor-grabbing">
               <input v-if="renamingColumnId === board.id" v-model="renameColumnTitle"
                 @click.stop @keyup.enter="handleRenameColumnSubmit(board)" @keyup.esc="renamingColumnId = null"
                 @blur="handleRenameColumnSubmit(board)" autofocus
-                class="text-sm font-medium text-gray-700 bg-white border border-blue-300 rounded px-1.5 py-0.5 outline-none min-w-0 flex-1" />
-              <span v-else class="text-sm font-medium text-gray-700 truncate">{{ board.title }}</span>
-              <span class="text-xs text-gray-400 bg-white border border-gray-200 rounded-full px-2 py-0.5 leading-none flex-shrink-0">
+                class="text-sm font-medium text-gray-700 dark:text-gray-100 bg-white dark:bg-gray-700 border border-blue-300 dark:border-blue-500 rounded px-1.5 py-0.5 outline-none min-w-0 flex-1" />
+              <span v-else class="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">{{ board.title }}</span>
+              <span class="text-xs text-gray-400 dark:text-gray-400 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-full px-2 py-0.5 leading-none flex-shrink-0">
                 {{ board.tasks?.length ?? 0 }}
               </span>
             </div>
@@ -48,12 +54,12 @@
               <button @click.stop="toggleColumnMenu(board.id)"
                 class="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded px-1.5 py-0.5 transition text-base leading-none select-none">···</button>
               <div v-if="openColumnMenuId === board.id"
-                class="absolute right-0 top-7 bg-white border border-gray-200 rounded-xl shadow-xl z-30 w-44 py-1 overflow-hidden">
+                class="absolute right-0 top-7 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl z-30 w-44 py-1 overflow-hidden">
                 <button v-if="canRenameColumn" @click.stop="startRenameColumn(board)"
-                  class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">Rename</button>
+                  class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition">Rename</button>
                 <button v-if="canDeleteColumn" @click.stop="handleDeleteColumn(board)"
                   class="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-50 transition">Delete</button>
-                <p v-if="!canRenameColumn && !canDeleteColumn" class="px-4 py-2 text-xs text-gray-400">Tidak ada aksi tersedia.</p>
+                <p v-if="!canRenameColumn && !canDeleteColumn" class="px-4 py-2 text-xs text-gray-400 dark:text-gray-500">Tidak ada aksi tersedia.</p>
               </div>
             </div>
           </div>
@@ -61,13 +67,13 @@
         <!-- Task Cards -->
         <!-- Task Cards -->
         <div class="flex-1 overflow-y-auto px-2.5 py-2">
-          <div v-if="!board.tasks?.length" class="text-xs text-gray-400 text-center py-8">No tasks</div>
+          <div v-if="!board.tasks?.length" class="text-xs text-gray-400 dark:text-gray-500 text-center py-8">No tasks</div>
 
           <VueDraggable v-model="board.tasks" group="tasks" :data-column-id="board.id" :animation="150"
             ghost-class="opacity-40" chosen-class="shadow-lg" class="flex flex-col gap-2 min-h-[40px]"
             @end="onTaskDragEnd">
             <div v-for="task in (board.tasks as Task[])" :key="task.id" :data-id="task.id"
-              class="bg-white rounded-lg border border-gray-200 p-3 cursor-grab active:cursor-grabbing hover:border-blue-400 hover:shadow-md transition-all group"
+              class="bg-white dark:bg-gray-700/60 rounded-lg border border-gray-200 dark:border-gray-600 p-3 cursor-grab active:cursor-grabbing hover:border-blue-400 hover:shadow-md transition-all group"
               @click="openModal(task)">
 
               <div v-if="task.label" class="mb-2">
@@ -75,7 +81,7 @@
                   :class="task.labelClass ?? 'bg-green-100 text-green-700'">{{ task.label }}</span>
               </div>
 
-              <p class="text-sm text-gray-800 leading-snug mb-2 font-normal">{{ task.title }}</p>
+              <p class="text-sm text-gray-800 dark:text-gray-100 leading-snug mb-2 font-normal">{{ task.title }}</p>
 
               <div class="flex flex-wrap gap-1.5 mb-2">
                 <span v-if="task.dueDate && task.dueDate !== '-'"
@@ -125,7 +131,7 @@
           <div v-if="addingTaskColumnId === board.id">
             <input v-model="newTaskTitle" @keyup.enter="handleCreateTask(board.id)"
               @keyup.esc="addingTaskColumnId = null; newTaskTitle = ''" placeholder="Task title..." autofocus
-              class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-blue-400 transition mb-2 bg-white" />
+              class="w-full text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 outline-none focus:border-blue-400 transition mb-2 bg-white dark:bg-gray-700 dark:text-gray-100" />
             <div class="flex gap-2">
               <button @click="handleCreateTask(board.id)" :disabled="taskCreating || !newTaskTitle.trim()"
                 class="flex-1 bg-blue-500 text-white text-xs py-1.5 rounded-lg hover:bg-blue-600 disabled:opacity-50 transition">
@@ -136,7 +142,7 @@
             </div>
           </div>
           <button v-else @click="addingTaskColumnId = board.id"
-            class="w-full text-left text-xs text-gray-400 border border-dashed border-gray-200 rounded-lg py-2 px-3 hover:bg-white hover:text-gray-600 hover:border-gray-300 transition">
+            class="w-full text-left text-xs text-gray-400 dark:text-gray-500 border border-dashed border-gray-200 dark:border-gray-600 rounded-lg py-2 px-3 hover:bg-white dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 hover:border-gray-300 transition">
             + Add card
           </button>
         </div>
@@ -155,7 +161,7 @@
         <div v-else class="bg-gray-50 rounded-xl border border-gray-200 p-3">
           <input v-model="newBoardTitle" @keyup.enter="handleCreateBoard"
             @keyup.esc="showNewBoard = false; newBoardTitle = ''" placeholder="Column title..." autofocus
-            class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-blue-400 transition mb-2 bg-white" />
+            class="w-full text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 outline-none focus:border-blue-400 transition mb-2 bg-white dark:bg-gray-700 dark:text-gray-100" />
           <div class="flex gap-2">
             <button @click="handleCreateBoard" :disabled="boardCreating || !newBoardTitle.trim()"
               class="flex-1 bg-blue-500 text-white text-xs py-1.5 rounded-lg hover:bg-blue-600 disabled:opacity-50 transition">
@@ -174,24 +180,24 @@
   <Teleport to="body">
     <div v-if="selectedTask" class="fixed inset-0 z-50 flex items-center justify-center"
       style="background: rgba(0,0,0,0.65)" @click.self="closeModal">
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl mx-4 flex flex-col overflow-hidden"
+      <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-4xl mx-4 flex flex-col overflow-hidden"
         style="max-height: 90vh" @click="closeAllDropdowns">
 
         <!-- Top Bar -->
-        <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100 flex-shrink-0">
+        <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
           <div class="flex items-center gap-2">
             <div class="relative">
               <button @click.stop="toggleStatusMenu"
-                class="flex items-center gap-1.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition">
+                class="flex items-center gap-1.5 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 px-3 py-1.5 rounded-lg transition">
                 {{ currentColumnTitle }}
                 <svg class="w-3 h-3" viewBox="0 0 10 6" fill="currentColor">
                   <path d="M0 0l5 6 5-6z" />
                 </svg>
               </button>
               <div v-if="statusOpen"
-                class="absolute left-0 top-10 bg-white border border-gray-200 rounded-xl shadow-xl z-20 py-1 min-w-[140px]">
+                class="absolute left-0 top-10 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl z-20 py-1 min-w-[140px]">
                 <button v-for="col in allColumns" :key="col.id" @click.stop="handleMoveTask(col.id); statusOpen = false"
-                  class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition"
+                  class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition"
                   :class="col.id === selectedTask?.column_id ? 'text-blue-600 font-semibold' : 'text-gray-700'">
                   {{ col.title }}
                 </button>
@@ -200,18 +206,18 @@
           </div>
           <div class="flex items-center gap-1">
             <button
-              class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition">
+              class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition">
               <font-awesome-icon icon="image" />
             </button>
             <div class="relative">
               <button @click.stop="toggleEllipsisMenu"
-                class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition">
+                class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition">
                 <font-awesome-icon icon="ellipsis-h" />
               </button>
               <div v-if="ellipsisOpen"
-                class="absolute right-0 top-10 bg-white border border-gray-200 rounded-xl shadow-xl z-20 w-52 py-1.5 overflow-hidden">
+                class="absolute right-0 top-10 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl z-20 w-52 py-1.5 overflow-hidden">
                 <template v-for="item in ellipsisMenuItems" :key="item.action">
-                  <div v-if="item.action === 'leave' || item.action === 'delete'" class="border-t border-gray-100 my-1"></div>
+                  <div v-if="item.action === 'leave' || item.action === 'delete'" class="border-t border-gray-100 dark:border-gray-700 my-1"></div>
                   <button @click.stop="handleEllipsisAction(item.action)"
                     class="w-full flex items-center gap-3 px-4 py-2 text-sm transition"
                     :class="item.danger ? 'text-red-500 hover:bg-red-50' : 'text-gray-700 hover:bg-gray-50'">
@@ -221,7 +227,7 @@
               </div>
             </div>
             <button @click.stop="closeModal"
-              class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 transition ml-1">
+              class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500 transition ml-1">
               <font-awesome-icon icon="times" />
             </button>
           </div>
@@ -234,7 +240,7 @@
             <div class="flex items-start gap-3 mb-5">
               <h2 contenteditable="true"
                 @blur="(e: FocusEvent) => handleTitleBlur((e.target as HTMLElement).innerText)"
-                class="text-xl font-bold text-gray-900 outline-none border-b-2 border-transparent focus:border-blue-400 flex-1 leading-tight">
+                class="text-xl font-bold text-gray-900 dark:text-gray-100 outline-none border-b-2 border-transparent focus:border-blue-400 flex-1 leading-tight">
                 {{ selectedTask.title }}</h2>
             </div>
 
@@ -243,18 +249,18 @@
               <div class="flex flex-wrap gap-2 mb-2">
                 <div class="relative">
                   <button @click.stop="toggleAddMenu"
-                    class="flex items-center gap-1.5 text-xs border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 text-gray-600 transition font-medium">
+                    class="flex items-center gap-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition font-medium">
                     <font-awesome-icon icon="plus" /> Add
                   </button>
                   <div v-if="addMenuOpen"
-                    class="absolute left-0 top-9 bg-white border border-gray-200 rounded-xl shadow-xl z-20 w-64 overflow-hidden">
-                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100">
+                    class="absolute left-0 top-9 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl z-20 w-64 overflow-hidden">
+                    <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-700">
                       <span class="text-xs font-semibold text-gray-500">Add to card</span>
                       <button @click.stop="addMenuOpen = false" class="text-gray-400 hover:text-gray-600">✕</button>
                     </div>
                     <div class="py-1">
                       <button v-for="item in addMenuItems" :key="item.action" @click.stop="handleAddAction(item.action)"
-                        class="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition text-left">
+                        class="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-700 transition text-left">
                         <div
                           class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 text-gray-600 text-xs">
                           +</div>
@@ -267,11 +273,11 @@
                   </div>
                 </div>
                 <button @click.stop="closeAllDropdowns(); addingSubtask = !addingSubtask"
-                  class="flex items-center gap-1.5 text-xs border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 text-gray-600 transition">
+                  class="flex items-center gap-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition">
                   <font-awesome-icon icon="check-square" /> Subtask
                 </button>
                 <button @click.stop="showAttachPanel = !showAttachPanel"
-                  class="flex items-center gap-1.5 text-xs border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 text-gray-600 transition"
+                  class="flex items-center gap-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition"
                   :class="showAttachPanel ? 'bg-gray-100 border-gray-400' : ''">
                   <font-awesome-icon icon="paperclip" /> Attachment
                 </button>
@@ -279,25 +285,25 @@
 
               <div class="flex flex-wrap items-center gap-4">
                 <div>
-                  <p class="text-xs text-gray-500 font-medium mb-1.5">Members</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1.5">Members</p>
                   <div class="flex items-center gap-1.5 flex-wrap">
                     <div v-for="m in assignedMembers" :key="m.id" class="relative group/member">
                       <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white"
                         :class="m.color" :title="m.name">{{ m.initial }}</div>
                       <button @click.stop="handleToggleMember(m.id)"
-                        class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-white border border-gray-300 text-gray-400 hover:text-red-500 hover:border-red-300 opacity-0 group-hover/member:opacity-100 transition text-[9px] flex items-center justify-center leading-none"
+                        class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-500 text-gray-400 hover:text-red-500 hover:border-red-300 opacity-0 group-hover/member:opacity-100 transition text-[9px] flex items-center justify-center leading-none"
                         title="Remove">✕</button>
                     </div>
                     <div class="relative">
                       <button @click.stop="toggleMemberMenu"
                         class="w-7 h-7 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 hover:border-blue-400 text-sm">+</button>
                       <div v-if="memberMenuOpen"
-                        class="absolute left-0 top-9 bg-white border border-gray-200 rounded-xl shadow-xl z-20 w-56 py-1 max-h-64 overflow-y-auto">
+                        class="absolute left-0 top-9 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl z-20 w-56 py-1 max-h-64 overflow-y-auto">
                         <button v-for="u in users" :key="u.id" @click.stop="handleToggleMember(u.id)"
-                          class="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-gray-50 transition text-left">
+                          class="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition text-left">
                           <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
                             :class="memberColor(u.id)">{{ (u.full_name || u.email || '?').charAt(0).toUpperCase() }}</div>
-                          <span class="flex-1 truncate text-gray-700">{{ u.full_name || u.email }}</span>
+                          <span class="flex-1 truncate text-gray-700 dark:text-gray-200">{{ u.full_name || u.email }}</span>
                           <font-awesome-icon v-if="(selectedTask?.assignee_ids ?? []).includes(u.id)" icon="check"
                             class="text-blue-500 text-xs" />
                         </button>
@@ -308,7 +314,7 @@
                 </div>
 
                 <div>
-                  <p class="text-xs text-gray-500 font-medium mb-1.5">Due date</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1.5">Due date</p>
                   <div class="flex items-center gap-1.5">
                     <span v-if="dueDateStatus(selectedTask.dueDate) === 'overdue' || dueDateStatus(selectedTask.dueDate) === 'soon'"
                       class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0"
@@ -316,7 +322,7 @@
                       {{ dueDateStatus(selectedTask.dueDate) === 'overdue' ? 'Overdue' : 'Due Soon' }}
                     </span>
                     <input type="date" :value="dueDateInputValue(selectedTask.dueDate)" @change="handleDueDateChange"
-                      class="text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 px-2.5 py-1.5 rounded-lg transition outline-none" />
+                      class="text-sm text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 px-2.5 py-1.5 rounded-lg transition outline-none" />
                   </div>
                 </div>
               </div>
@@ -325,21 +331,21 @@
             <div class="mb-6">
               <div class="flex items-center gap-2 mb-2">
                 <font-awesome-icon icon="align-left" class="text-gray-500 text-sm" />
-                <p class="text-sm font-semibold text-gray-700">Description</p>
+                <p class="text-sm font-semibold text-gray-700 dark:text-gray-200">Description</p>
               </div>
               <textarea v-model="selectedTask.description" @blur="handleDescriptionBlur" placeholder="Add a more detailed description..." rows="3"
-                class="w-full text-sm text-gray-600 border border-gray-200 rounded-lg px-3 py-2.5 outline-none focus:border-blue-400 resize-none transition placeholder-gray-400"></textarea>
+                class="w-full text-sm text-gray-600 dark:text-gray-200 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2.5 outline-none focus:border-blue-400 resize-none transition placeholder-gray-400 bg-white dark:bg-gray-700"></textarea>
             </div>
 
-            <div class="mb-6 p-3 bg-gray-50 border border-gray-200 rounded-xl">
+            <div class="mb-6 p-3 bg-gray-50 dark:bg-gray-700/40 border border-gray-200 dark:border-gray-700 rounded-xl">
               <div class="flex items-center justify-between gap-3">
                 <div class="flex items-center gap-2 flex-shrink-0">
                   <font-awesome-icon icon="clock" class="text-gray-500 text-sm" />
-                  <p class="text-sm font-semibold text-gray-700">Time Tracker</p>
+                  <p class="text-sm font-semibold text-gray-700 dark:text-gray-200">Time Tracker</p>
                 </div>
                 <input v-if="activeTimerTaskId !== selectedTask.id" v-model="timerDescription" type="text"
                   placeholder="Sedang mengerjakan apa? (opsional)"
-                  class="flex-1 min-w-0 text-xs text-gray-600 border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-400 transition placeholder-gray-400" />
+                  class="flex-1 min-w-0 text-xs text-gray-600 dark:text-gray-200 border border-gray-200 dark:border-gray-600 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-400 transition placeholder-gray-400 bg-white dark:bg-gray-700" />
                 <div class="flex items-center gap-2 flex-shrink-0">
                   <span class="text-sm font-mono font-semibold"
                     :class="activeTimerTaskId === selectedTask.id ? 'text-green-600' : 'text-gray-500'">
@@ -356,9 +362,9 @@
               </div>
 
               <!-- Riwayat time log: "13:00 → 16:00, 3 jam" -->
-              <div class="mt-3 pt-3 border-t border-gray-200">
+              <div class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                 <div class="flex items-center justify-between mb-2">
-                  <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Time Logs</p>
+                  <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Time Logs</p>
                   <span v-if="timerLogs.length" class="text-xs text-gray-500">
                     Total {{ formatDuration(totalDurationSeconds(timerLogs)) }}
                   </span>
@@ -370,7 +376,7 @@
 
                 <ul v-else class="space-y-1.5 max-h-40 overflow-y-auto">
                   <li v-for="log in timerLogs" :key="log.id"
-                    class="py-1 border-b border-gray-100 last:border-0">
+                    class="py-1 border-b border-gray-100 dark:border-gray-700 last:border-0">
                     <div class="flex items-baseline justify-between gap-3 text-xs">
                       <span class="text-gray-400 flex-shrink-0 w-20">{{ formatLogDate(log.start_time) }}</span>
                       <span class="text-gray-700 tabular-nums flex-1">{{ formatTimerLog(log) }}</span>
@@ -392,7 +398,7 @@
               <div class="flex items-center justify-between mb-3">
                 <div class="flex items-center gap-2">
                   <font-awesome-icon icon="check-square" class="text-gray-500 text-sm" />
-                  <p class="text-sm font-semibold text-gray-700">Subtasks</p>
+                  <p class="text-sm font-semibold text-gray-700 dark:text-gray-200">Subtasks</p>
                   <span class="text-xs text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">
                     {{selectedTask.subtasks?.filter(s => s.completed).length ?? 0}}/{{ selectedTask.subtasks?.length
                       ?? 0 }}
@@ -416,12 +422,12 @@
               <!-- Subtask list -->
               <div class="space-y-1.5">
                 <div v-for="sub in (selectedTask.subtasks ?? [])" :key="sub.id"
-                  class="flex items-center gap-2 group px-2 py-1.5 rounded-lg hover:bg-gray-50 transition">
+                  class="flex items-center gap-2 group px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
                   <input type="checkbox" :checked="sub.completed" @change="handleToggleSubtask(sub.id, !sub.completed)"
                     class="w-4 h-4 rounded accent-blue-600 cursor-pointer flex-shrink-0" />
                   <span contenteditable="true"
                     @blur="(e: FocusEvent) => handleRenameSubtask(sub.id, sub.title, (e.target as HTMLElement).innerText)"
-                    class="text-sm flex-1 outline-none border-b border-transparent focus:border-blue-400 transition"
+                    class="text-sm flex-1 outline-none border-b border-transparent focus:border-blue-400 transition dark:text-gray-200"
                     :class="sub.completed ? 'line-through text-gray-400' : 'text-gray-700'">
                     {{ sub.title }}
                   </span>
@@ -432,9 +438,9 @@
 
               <!-- Add subtask input -->
               <div v-if="addingSubtask" class="mt-2 flex gap-2">
-                <input v-model="newSubtaskTitle" @keyup.enter="handleAddSubtask"
+                <input ref="subtaskInput" v-model="newSubtaskTitle" @keyup.enter="handleAddSubtask"
                   @keyup.esc="addingSubtask = false; newSubtaskTitle = ''" placeholder="Subtask title..." autofocus
-                  class="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:border-blue-400 transition" />
+                  class="flex-1 text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5 outline-none focus:border-blue-400 transition bg-white dark:bg-gray-700 dark:text-gray-100" />
                 <button @click="handleAddSubtask" :disabled="subtaskCreating || !newSubtaskTitle.trim()"
                   class="bg-blue-500 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-blue-600 disabled:opacity-50 transition">
                   {{ subtaskCreating ? '...' : 'Add' }}
@@ -448,11 +454,11 @@
             <div v-if="(selectedTask.attachments?.length ?? 0) > 0" class="mb-6">
               <div class="flex items-center gap-2 mb-2">
                 <font-awesome-icon icon="paperclip" class="text-gray-400 text-xs" />
-                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Attachments</p>
+                <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Attachments</p>
               </div>
               <div class="space-y-2">
                 <div v-for="(att, i) in selectedTask.attachments" :key="i"
-                  class="flex items-center justify-between gap-2 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 group hover:border-gray-300 transition">
+                  class="flex items-center justify-between gap-2 bg-gray-50 dark:bg-gray-700/40 border border-gray-100 dark:border-gray-700 rounded-lg px-3 py-2 group hover:border-gray-300 dark:hover:border-gray-500 transition">
                   <div class="flex items-center gap-3 min-w-0">
                     <img v-if="att.url && att.type === 'image'" :src="att.url"
                       class="w-12 h-12 rounded object-cover flex-shrink-0 border border-gray-200" />
@@ -465,7 +471,7 @@
                         class="text-xs font-medium text-blue-600 hover:underline block truncate max-w-[200px]">{{
                           att.title ??
                           att.url }}</a>
-                      <p v-else class="text-xs font-medium text-gray-700 truncate">{{ att.title ?? '-' }}</p>
+                      <p v-else class="text-xs font-medium text-gray-700 dark:text-gray-200 truncate">{{ att.title ?? '-' }}</p>
                       <p class="text-xs text-gray-400 mt-0.5">{{ att.type === 'image' ? 'Image' : att.type === 'link' ?
                         'Link' :
                         'File' }}</p>
@@ -480,47 +486,79 @@
 
           </div>
 
-          <!-- RIGHT: Comments -->
-          <div class="w-72 border-l border-gray-100 flex flex-col flex-shrink-0">
-            <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-              <div class="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                <font-awesome-icon icon="comment-alt" class="text-gray-400" />
-                Comments and activity
-              </div>
-              <button @click="showActivity = !showActivity"
-                class="text-xs text-gray-500 border border-gray-200 rounded-lg px-2 py-1 hover:bg-gray-50 transition">
-                {{ showActivity ? 'Hide' : 'Show' }}
+          <!-- RIGHT: Comments & Activity (tab terpisah) -->
+          <div class="w-72 border-l border-gray-100 dark:border-gray-700 flex flex-col flex-shrink-0">
+            <!-- Tabs -->
+            <div class="flex items-stretch border-b border-gray-100 dark:border-gray-700 px-2 pt-2 gap-1">
+              <button @click="activeTab = 'comments'"
+                class="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-t-lg transition border-b-2 -mb-px"
+                :class="activeTab === 'comments'
+                  ? 'text-blue-600 border-blue-500'
+                  : 'text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-200'">
+                <font-awesome-icon icon="comment-alt" />
+                Comments
+                <span class="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 rounded-full px-1.5">{{ commentItems.length }}</span>
+              </button>
+              <button @click="activeTab = 'activity'"
+                class="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-t-lg transition border-b-2 -mb-px"
+                :class="activeTab === 'activity'
+                  ? 'text-blue-600 border-blue-500'
+                  : 'text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-200'">
+                <font-awesome-icon icon="align-left" />
+                Activity
+                <span class="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 rounded-full px-1.5">{{ activityItems.length }}</span>
               </button>
             </div>
-            <div class="px-4 py-3 border-b border-gray-100">
+
+            <!-- Comment composer (hanya tab Comments) -->
+            <div v-if="activeTab === 'comments'" class="px-4 py-3 border-b border-gray-100 dark:border-gray-700">
               <input v-model="newComment" @keyup.enter="handleAddComment" :disabled="commentLoading"
                 placeholder="Write a comment..."
-                class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-blue-400 transition placeholder-gray-400 disabled:opacity-50" />
+                class="w-full text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 outline-none focus:border-blue-400 transition placeholder-gray-400 disabled:opacity-50 bg-white dark:bg-gray-700 dark:text-gray-100" />
               <button @click="handleAddComment" :disabled="commentLoading || !newComment.trim()"
                 class="mt-2 w-full bg-blue-500 hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-medium py-1.5 rounded-lg transition">
                 {{ commentLoading ? 'Sending...' : 'Send' }}
               </button>
             </div>
-            <div class="flex-1 overflow-y-auto px-4 py-3 space-y-4">
-              <div v-for="(act, i) in selectedTask.activity" :key="i" class="flex gap-2.5 group">
-                <div
-                  class="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold text-white mt-0.5"
+
+            <!-- Comments tab -->
+            <div v-if="activeTab === 'comments'" class="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+              <p v-if="commentsLoading" class="text-xs text-gray-400 dark:text-gray-500 text-center py-4">Memuat…</p>
+              <p v-else-if="!commentItems.length" class="text-xs text-gray-400 dark:text-gray-500 text-center py-8">
+                Belum ada komentar.
+              </p>
+              <div v-for="{ act, i } in commentItems" :key="i" class="flex gap-2.5 group">
+                <div class="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold text-white mt-0.5"
                   :class="act.color || 'bg-blue-500'">{{ act.initial }}</div>
                 <div class="flex-1 min-w-0">
                   <div class="flex items-baseline gap-1 flex-wrap justify-between">
-                    <div class="flex items-baseline gap-1">
-                      <span class="text-xs font-semibold text-gray-800">{{ act.author }}</span>
-                      <span class="text-xs text-gray-500">{{ act.action }}</span>
-                    </div>
-                    <button v-if="act.comment && act.id && canDeleteTask" @click="handleDeleteComment(act.id, i)"
+                    <span class="text-xs font-semibold text-gray-800 dark:text-gray-100">{{ act.author }}</span>
+                    <button v-if="act.id && canDeleteTask" @click="handleDeleteComment(act.id, i)"
                       class="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition text-xs"
                       title="Delete">✕</button>
                   </div>
                   <p class="text-xs text-blue-500 mt-0.5">{{ act.date }}</p>
-                  <div v-if="act.comment" class="mt-1.5 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-                    <p class="text-xs font-medium text-blue-600">{{ act.comment.title }}</p>
-                    <p class="text-xs text-gray-600 mt-0.5">{{ act.comment.body }}</p>
+                  <div class="mt-1.5 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2">
+                    <p class="text-xs text-gray-600 dark:text-gray-300">{{ act.comment?.body }}</p>
                   </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Activity tab -->
+            <div v-else class="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+              <p v-if="!activityItems.length" class="text-xs text-gray-400 dark:text-gray-500 text-center py-8">
+                Belum ada aktivitas.
+              </p>
+              <div v-for="{ act, i } in activityItems" :key="i" class="flex gap-2.5">
+                <div class="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold text-white mt-0.5"
+                  :class="act.color || 'bg-blue-500'">{{ act.initial }}</div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-baseline gap-1 flex-wrap">
+                    <span class="text-xs font-semibold text-gray-800 dark:text-gray-100">{{ act.author }}</span>
+                    <span class="text-xs text-gray-500 dark:text-gray-400">{{ act.action }}</span>
+                  </div>
+                  <p class="text-xs text-blue-500 mt-0.5">{{ act.date }}</p>
                 </div>
               </div>
             </div>
@@ -528,22 +566,22 @@
         </div>
 
         <!-- Attachment Panel -->
-        <div v-if="showAttachPanel" class="border-t border-gray-100 px-6 py-4 bg-gray-50 flex-shrink-0">
+        <div v-if="showAttachPanel" class="border-t border-gray-100 dark:border-gray-700 px-6 py-4 bg-gray-50 dark:bg-gray-700/40 flex-shrink-0">
           <div class="flex items-center justify-between mb-3">
-            <p class="text-sm font-semibold text-gray-700">Add Attachment</p>
+            <p class="text-sm font-semibold text-gray-700 dark:text-gray-200">Add Attachment</p>
             <button @click="showAttachPanel = false; showAttachLink = false"
               class="text-gray-400 hover:text-gray-600 text-xs">✕
               Close</button>
           </div>
           <div class="flex gap-2 flex-wrap">
             <label
-              class="cursor-pointer flex items-center gap-2 border border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-600 hover:bg-white transition">
+              class="cursor-pointer flex items-center gap-2 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-xs text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700 transition">
               <font-awesome-icon icon="paperclip" />
               {{ attachFileLoading ? 'Uploading...' : 'Upload File' }}
               <input type="file" class="hidden" @change="handleUploadFile" :disabled="attachFileLoading" />
             </label>
             <button @click="showAttachLink = !showAttachLink"
-              class="flex items-center gap-2 border border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-600 hover:bg-white transition">
+              class="flex items-center gap-2 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-xs text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700 transition">
               🔗 Add Link
             </button>
           </div>
@@ -568,11 +606,11 @@
   <Teleport to="body">
     <div v-if="showMembersPanel" class="fixed inset-0 z-50 flex items-center justify-center"
       style="background: rgba(0,0,0,0.65)" @click.self="showMembersPanel = false">
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 flex flex-col overflow-hidden" style="max-height: 85vh">
-        <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100 flex-shrink-0">
-          <p class="text-sm font-semibold text-gray-800">Board Members</p>
+      <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md mx-4 flex flex-col overflow-hidden" style="max-height: 85vh">
+        <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
+          <p class="text-sm font-semibold text-gray-800 dark:text-gray-100">Board Members</p>
           <button @click="showMembersPanel = false"
-            class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 transition">
+            class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500 transition">
             <font-awesome-icon icon="times" />
           </button>
         </div>
@@ -587,12 +625,12 @@
               <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
                 :class="memberColor(m.user_id)">{{ resolveUserLabel(m.user_id).initial }}</div>
               <div class="flex-1 min-w-0">
-                <p class="text-sm text-gray-700 truncate">{{ resolveUserLabel(m.user_id).name }}</p>
+                <p class="text-sm text-gray-700 dark:text-gray-200 truncate">{{ resolveUserLabel(m.user_id).name }}</p>
               </div>
               <select v-if="canChangeMemberRole" :value="m.role" :disabled="isSoleOwner(m.user_id)"
                 @change="handleUpdateMemberRole(m.user_id, ($event.target as HTMLSelectElement).value as BoardRole)"
                 :title="isSoleOwner(m.user_id) ? 'Satu-satunya owner — tidak bisa diubah' : ''"
-                class="text-xs border border-gray-200 rounded-lg px-2 py-1 outline-none focus:border-blue-400 transition bg-white disabled:opacity-50 disabled:cursor-not-allowed">
+                class="text-xs border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1 outline-none focus:border-blue-400 transition bg-white dark:bg-gray-700 dark:text-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">
                 <option value="owner">Owner</option>
                 <option value="admin">Admin</option>
                 <option value="member">Member</option>
@@ -606,16 +644,16 @@
           </div>
         </div>
 
-        <div v-if="canInviteMember" class="border-t border-gray-100 px-5 py-4 flex-shrink-0">
-          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Add Member</p>
+        <div v-if="canInviteMember" class="border-t border-gray-100 dark:border-gray-700 px-5 py-4 flex-shrink-0">
+          <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Add Member</p>
           <div class="flex gap-2">
             <select v-model="newMemberUserId"
-              class="flex-1 min-w-0 text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-400 transition bg-white">
+              class="flex-1 min-w-0 text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-400 transition bg-white dark:bg-gray-700 dark:text-gray-100">
               <option value="" disabled>Pilih user...</option>
               <option v-for="u in addableUsers" :key="u.id" :value="u.id">{{ u.full_name || u.email }}</option>
             </select>
             <select v-model="newMemberRole"
-              class="text-sm border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-blue-400 transition bg-white">
+              class="text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 outline-none focus:border-blue-400 transition bg-white dark:bg-gray-700 dark:text-gray-100">
               <option value="member">Member</option>
               <option value="admin">Admin</option>
               <option value="owner">Owner</option>
@@ -631,13 +669,53 @@
     </div>
   </Teleport>
 
+  <!-- Archived Cards Panel -->
+  <Teleport to="body">
+    <div v-if="showArchivedPanel" class="fixed inset-0 z-50 flex items-center justify-center"
+      style="background: rgba(0,0,0,0.65)" @click.self="showArchivedPanel = false">
+      <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md mx-4 flex flex-col overflow-hidden" style="max-height: 85vh">
+        <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
+          <div class="flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-gray-100">
+            <font-awesome-icon icon="box-archive" class="text-gray-400" />
+            Archived Cards
+          </div>
+          <button @click="showArchivedPanel = false"
+            class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500 transition">
+            <font-awesome-icon icon="times" />
+          </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto px-5 py-4">
+          <p v-if="!archivedTasks.length" class="text-xs text-gray-400 dark:text-gray-500 text-center py-8">
+            Belum ada card yang diarsipkan.
+          </p>
+          <div v-else class="space-y-2">
+            <div v-for="t in archivedTasks" :key="t.id"
+              class="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
+              <div class="flex-1 min-w-0">
+                <p class="text-sm text-gray-700 dark:text-gray-200 truncate">{{ t.title }}</p>
+                <p v-if="t._archivedFromColumnTitle" class="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
+                  dari "{{ t._archivedFromColumnTitle }}"
+                </p>
+              </div>
+              <button @click="handleUnarchiveTask(t.id)"
+                class="flex items-center gap-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition flex-shrink-0">
+                Unarchive
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
   <!-- Delete Card Confirmation -->
   <Teleport to="body">
     <div v-if="deleteTaskConfirmOpen" class="fixed inset-0 z-[70] flex items-center justify-center"
       style="background: rgba(0,0,0,0.65)" @click.self="deleteTaskConfirmOpen = false">
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-5">
-        <p class="text-sm font-semibold text-gray-800 mb-2">Hapus card ini?</p>
-        <p class="text-xs text-gray-500 leading-relaxed mb-5">
+      <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-5">
+        <p class="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-2">Hapus card ini?</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 leading-relaxed mb-5">
           Card "{{ selectedTask?.title }}" akan dihapus permanen beserta subtask, komentar, dan attachment-nya.
           Tindakan ini tidak bisa dibatalkan.
         </p>
@@ -668,20 +746,20 @@
 
 <script setup lang="ts">
 import { VueDraggable } from 'vue-draggable-plus'
-import { moveTask as apiMoveTask } from '../api/task.api'
+import { moveTask as apiMoveTask, getTaskDetail as apiGetTaskDetail } from '../api/task.api'
 import {
   reorderColumn as apiReorderColumn,
   updateColumn as apiUpdateColumn,
   deleteColumn as apiDeleteColumn,
 } from '../api/column.api'
 import { useRoute, useRouter } from 'vue-router'
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import Layout from '../../../components/common/AppLayout.vue'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import {
   faClock, faPlay, faStop, faPlus, faTag, faCheckSquare, faPaperclip,
-  faAlignLeft, faEye, faImage, faEllipsisH, faTimes, faCommentAlt, faCheck, faUsers, faArrowLeft,
+  faAlignLeft, faEye, faImage, faEllipsisH, faTimes, faCommentAlt, faCheck, faUsers, faArrowLeft, faBoxArchive,
 } from '@fortawesome/free-solid-svg-icons'
 import {
   addComment as apiAddComment,
@@ -744,13 +822,13 @@ interface Task {
   labelClass?: string
 }
 
-library.add(faClock, faPlay, faStop, faPlus, faTag, faCheckSquare, faPaperclip, faAlignLeft, faEye, faImage, faEllipsisH, faTimes, faCommentAlt, faCheck, faUsers, faArrowLeft)
+library.add(faClock, faPlay, faStop, faPlus, faTag, faCheckSquare, faPaperclip, faAlignLeft, faEye, faImage, faEllipsisH, faTimes, faCommentAlt, faCheck, faUsers, faArrowLeft, faBoxArchive)
 
 const route = useRoute()
 const router = useRouter()
 const boardId = route.params.boardId as string
 const store = useAppStore()
-const { columnsByBoard, users, boards: boardList, boardMembers } = storeToRefs(store)
+const { columnsByBoard, users, boards: boardList, boardMembers, archivedByBoard } = storeToRefs(store)
 const boards = computed(() => columnsByBoard.value[boardId] ?? [])
 
 const { user: currentUser, fetchCurrentUser } = useAuth()
@@ -772,13 +850,14 @@ const renamingColumnId = ref<string | null>(null)
 const renameColumnTitle = ref('')
 const newComment = ref('')
 const commentLoading = ref(false)
+const commentsLoading = ref(false)
 const showAttachPanel = ref(false)
 const showAttachLink = ref(false)
 const attachLinkTitle = ref('')
 const attachLinkUrl = ref('')
 const attachLinkLoading = ref(false)
 const attachFileLoading = ref(false)
-const showActivity = ref(true)
+const activeTab = ref<'comments' | 'activity'>('comments')
 const toast = ref('')
 const showNewBoard = ref(false)
 const newBoardTitle = ref('')
@@ -788,6 +867,11 @@ const boardCreating = ref(false)
 const newSubtaskTitle = ref('')
 const addingSubtask = ref(false)
 const subtaskCreating = ref(false)
+const subtaskInput = ref<HTMLInputElement | null>(null)
+
+// ─── Archived Panel State ──────────────────────────────────────
+const showArchivedPanel = ref(false)
+const archivedTasks = computed(() => archivedByBoard.value[boardId] ?? [])
 
 // ─── Board Members Panel State ─────────────────────────────────
 const showMembersPanel = ref(false)
@@ -848,6 +932,21 @@ function resolveMembers(ids?: string[]) {
 
 const assignedMembers = computed(() => resolveMembers(selectedTask.value?.assignee_ids))
 
+// Feed gabungan `activity` dipisah jadi dua tab: item yang punya `.comment`
+// adalah komentar, sisanya (hanya `.action`) adalah log aktivitas. Index asli
+// dipertahankan karena handleDeleteComment memakai index ke selectedTask.activity.
+const commentItems = computed(() =>
+  (selectedTask.value?.activity ?? [])
+    .map((act, i) => ({ act, i }))
+    .filter(({ act }) => !!act.comment)
+)
+
+const activityItems = computed(() =>
+  (selectedTask.value?.activity ?? [])
+    .map((act, i) => ({ act, i }))
+    .filter(({ act }) => !act.comment)
+)
+
 function resolveUserLabel(userId: string): { name: string; initial: string } {
   const u = users.value.find((u: any) => u.id === userId)
   const name = u?.full_name ?? u?.email ?? 'Unknown'
@@ -880,6 +979,7 @@ function isSoleOwner(userId: string): boolean {
 
 const canCreateTask = computed(() => hasPermission(myBoardRole.value, 'task.create'))
 const canDeleteTask = computed(() => hasPermission(myBoardRole.value, 'task.delete'))
+const canArchiveTask = computed(() => hasPermission(myBoardRole.value, 'task.archive'))
 const canCreateColumn = computed(() => hasPermission(myBoardRole.value, 'column.create'))
 const canRenameColumn = computed(() => hasPermission(myBoardRole.value, 'column.rename'))
 const canDeleteColumn = computed(() => hasPermission(myBoardRole.value, 'column.delete'))
@@ -1085,9 +1185,12 @@ async function handleAddSubtask() {
   try {
     await store.addSubtask(selectedTask.value.id, title)
     newSubtaskTitle.value = ''
-    addingSubtask.value = false
     logActivity(`menambahkan checklist "${title}"`)
-    showToast('Subtask added.')
+    // Ala Trello: setelah Enter, composer tetap terbuka & fokus balik ke input
+    // supaya bisa langsung mengetik item berikutnya tanpa klik tombol lagi.
+    addingSubtask.value = true
+    await nextTick()
+    subtaskInput.value?.focus()
   } catch (e: any) {
     showToast(apiErrorMessage(e, 'Gagal menambah subtask.'))
   } finally {
@@ -1152,6 +1255,7 @@ async function handleTimerToggle(task: Task) {
       localStorage.setItem('active_timer_task_id', task.id)
       localStorage.setItem('active_timer_task_title', task.title ?? '')
       localStorage.setItem('active_timer_board_id', boardId)
+      localStorage.setItem('active_timer_started_at', String(Date.now()))
       timerDescription.value = ''
       startTick(task.id)
       startPing(task.id)
@@ -1172,6 +1276,7 @@ async function doStopTimer(taskId: string) {
     localStorage.removeItem('active_timer_task_id')
     localStorage.removeItem('active_timer_task_title')
     localStorage.removeItem('active_timer_board_id')
+    localStorage.removeItem('active_timer_started_at')
     showToast(`Timer stopped ⏹ — ${formatTimer(elapsed)}`)
 
     // Log baru baru tercatat di backend setelah stop — tarik ulang biar langsung tampil.
@@ -1415,6 +1520,7 @@ const ellipsisMenuItems = computed(() => {
   const items: { label: string; action: string; danger: boolean }[] = [
     { label: 'Share', action: 'share', danger: false },
   ]
+  if (canArchiveTask.value) items.push({ label: 'Archive', action: 'archive', danger: false })
   if (isOnThisCard.value) items.push({ label: 'Leave card', action: 'leave', danger: true })
   if (canDeleteTask.value) items.push({ label: 'Delete', action: 'delete', danger: true })
   return items
@@ -1423,12 +1529,34 @@ const ellipsisMenuItems = computed(() => {
 function handleEllipsisAction(action: string) {
   ellipsisOpen.value = false
   if (action === 'share') { navigator.clipboard?.writeText(window.location.href).catch(() => { }); showToast('Link copied!'); return }
+  if (action === 'archive') { handleArchiveTask(); return }
   if (action === 'leave') {
     const myId = currentUser.value?.id
     if (myId) handleToggleMember(myId)
     return
   }
   if (action === 'delete') { handleDeleteTask(); return }
+}
+
+async function handleArchiveTask() {
+  if (!selectedTask.value) return
+  const title = selectedTask.value.title
+  try {
+    await store.archiveTaskInStore(selectedTask.value.id)
+    closeModal()
+    showToast(`Card "${title}" diarsipkan.`)
+  } catch (e: any) {
+    showToast(apiErrorMessage(e, 'Gagal mengarsipkan card.'))
+  }
+}
+
+async function handleUnarchiveTask(taskId: string) {
+  try {
+    await store.unarchiveTaskInStore(taskId, boardId)
+    showToast('Card dikembalikan dari arsip.')
+  } catch (e: any) {
+    showToast(apiErrorMessage(e, 'Gagal unarchive card.'))
+  }
 }
 
 const addMenuItems = [
@@ -1449,6 +1577,7 @@ function handleAddAction(action: string) {
 // ─── Modal ────────────────────────────────────────────────────
 function openModal(task: Task) {
   selectedTask.value = task
+  activeTab.value = 'comments'
   closeAllDropdowns()
   addingSubtask.value = false
   showAttachPanel.value = false
@@ -1458,6 +1587,38 @@ function openModal(task: Task) {
   timerLogsError.value = ''
   timerDescription.value = ''
   loadTimerLogs(task.id)
+  loadPersistedComments(task)
+}
+
+// Card list dari backend tidak menyertakan komentar — hanya GET /tasks/{id}
+// (TaskDetailResponse) yang punya. Tarik saat modal dibuka supaya tab Comments
+// menampilkan komentar tersimpan, bukan cuma yang diketik di sesi ini.
+async function loadPersistedComments(task: Task) {
+  commentsLoading.value = true
+  try {
+    const detail = await apiGetTaskDetail(task.id, boardId)
+    // Modal keburu ditutup / ganti card sebelum request selesai.
+    if (selectedTask.value?.id !== task.id) return
+    const comments = (detail?.comments ?? [])
+      .map((c: any): ActivityItem => ({
+        author: c.user_name ?? 'Unknown',
+        initial: (c.user_name ?? '?').charAt(0).toUpperCase(),
+        color: memberColor(c.user_id ?? c.id ?? ''),
+        action: '',
+        date: new Date(c.created_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        comment: { title: 'Comment', body: c.content },
+        id: c.id,
+      }))
+      .sort((a: ActivityItem, b: ActivityItem) => (b.id ?? '').localeCompare(a.id ?? ''))
+    // Pertahankan log aktivitas sesi (item tanpa .comment); ganti bagian komentar
+    // dengan data backend agar tidak dobel dengan komentar yang tadi diketik.
+    const sessionLogs = task.activity.filter(a => !a.comment)
+    task.activity = [...comments, ...sessionLogs]
+  } catch {
+    // Diamkan — biarkan feed sesi apa adanya kalau gagal memuat.
+  } finally {
+    if (selectedTask.value?.id === task.id) commentsLoading.value = false
+  }
 }
 
 function closeModal() {
@@ -1484,6 +1645,8 @@ async function handleAddComment() {
       comment: { title: 'Comment', body: content },
     })
     newComment.value = ''
+    // Reconcile dengan backend supaya komentar baru dapat id asli (untuk delete).
+    loadPersistedComments(selectedTask.value)
   } catch (e: any) {
     showToast(apiErrorMessage(e, 'Gagal mengirim komentar.'))
   } finally {
