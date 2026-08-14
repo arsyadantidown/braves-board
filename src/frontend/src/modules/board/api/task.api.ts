@@ -29,6 +29,15 @@ export async function deleteTask(taskId: string, boardId: string) {
   await http.delete(`/tasks/${taskId}`, { params: { board_id: boardId } })
 }
 
+// Set status "complete" pada level task. Endpoint ini BELUM ADA di backend
+// (is_completed masih read-only) — lihat BACKEND_REQUESTS.md poin 1. Ditulis
+// sesuai kontrak yang direkomendasikan (mirror PATCH /subtasks/{id}/complete)
+// supaya begitu backend menyediakannya, langsung berfungsi tanpa ubah UI.
+export async function setTaskComplete(taskId: string, isCompleted: boolean, boardId: string) {
+  const res = await http.patch(`/tasks/${taskId}/complete`, { is_completed: isCompleted }, { params: { board_id: boardId } })
+  return res.data?.data ?? res.data
+}
+
 export async function archiveTask(taskId: string, boardId: string) {
   const res = await http.patch(`/tasks/${taskId}/archive`, null, { params: { board_id: boardId } })
   return res.data?.data ?? res.data

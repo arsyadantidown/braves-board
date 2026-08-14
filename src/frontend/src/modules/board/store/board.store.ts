@@ -16,6 +16,7 @@ import {
   moveTask as apiMoveTask,
   archiveTask as apiArchiveTask,
   unarchiveTask as apiUnarchiveTask,
+  setTaskComplete as apiSetTaskComplete,
 } from '../api/task.api'
 import { createSubtask as apiCreateSubtask, updateSubtask as apiUpdateSubtask, deleteSubtask as apiDeleteSubtask, completeSubtask as apiCompleteSubtask } from '../api/subtask.api'
 import {
@@ -265,6 +266,20 @@ export const useAppStore = defineStore('app', () => {
     if (col) col.tasks = col.tasks.filter((t: any) => t.id !== taskId)
   }
 
+  // Status complete HARUS dari backend (bukan localStorage) supaya dashboard
+  // akurat. State store baru diupdate KALAU request sukses; kalau endpoint
+  // belum ada, error dilempar ke pemanggil dan UI tidak berubah (tidak palsu).
+  async function setTaskCompleteInStore(taskId: string, isCompleted: boolean) {
+    const boardId = findBoardIdForTask(taskId)
+    if (!boardId) throw new Error('Board tidak ditemukan untuk task ini.')
+    const res = await apiSetTaskComplete(taskId, isCompleted, boardId)
+    const found = findTaskInStore(taskId)
+    if (found) {
+      found.col.tasks[found.idx].is_completed = res?.is_completed ?? isCompleted
+    }
+    return res
+  }
+
   async function archiveTaskInStore(taskId: string) {
     const boardId = findBoardIdForTask(taskId)
     if (!boardId) throw new Error('Board tidak ditemukan untuk task ini.')
@@ -394,7 +409,7 @@ export const useAppStore = defineStore('app', () => {
     boardMembers, fetchBoardMembers,
     addBoardMemberToStore, updateBoardMemberRoleInStore, removeBoardMemberFromStore, getMyRole,
     columnsByBoard, fetchColumns, addColumn, blockedBoardIds,
-    archivedByBoard, archiveTaskInStore, unarchiveTaskInStore,
+    archivedByBoard, archiveTaskInStore, unarchiveTaskInStore, setTaskCompleteInStore,
     findBoardIdForColumn, findBoardIdForTask,
     fetchTasks, addTask, editTask, removeTask, moveTaskToColumn, addSubtask, toggleSubtask, renameSubtask, removeSubtask,
   }

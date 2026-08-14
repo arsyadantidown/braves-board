@@ -73,7 +73,10 @@
             ghost-class="opacity-40" chosen-class="shadow-lg" class="flex flex-col gap-2 min-h-[40px]"
             @end="onTaskDragEnd">
             <div v-for="task in (board.tasks as Task[])" :key="task.id" :data-id="task.id"
-              class="bg-white dark:bg-gray-700/60 rounded-lg border border-gray-200 dark:border-gray-600 p-3 cursor-grab active:cursor-grabbing hover:border-blue-400 hover:shadow-md transition-all group"
+              class="rounded-lg border p-3 cursor-grab active:cursor-grabbing hover:border-blue-400 hover:shadow-md transition-all group"
+              :class="task.is_completed
+                ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-600/50'
+                : 'bg-white dark:bg-gray-700/60 border-gray-200 dark:border-gray-600'"
               @click="openModal(task)">
 
               <div v-if="task.label" class="mb-2">
@@ -81,7 +84,13 @@
                   :class="task.labelClass ?? 'bg-green-100 text-green-700'">{{ task.label }}</span>
               </div>
 
-              <p class="text-sm text-gray-800 dark:text-gray-100 leading-snug mb-2 font-normal">{{ task.title }}</p>
+              <div class="flex items-start gap-1.5 mb-2">
+                <font-awesome-icon v-if="task.is_completed" icon="circle-check"
+                  class="text-emerald-500 text-sm mt-0.5 flex-shrink-0" title="Completed" />
+                <p class="text-sm leading-snug font-normal"
+                  :class="task.is_completed ? 'text-emerald-800 dark:text-emerald-200' : 'text-gray-800 dark:text-gray-100'">
+                  {{ task.title }}</p>
+              </div>
 
               <div class="flex flex-wrap gap-1.5 mb-2">
                 <span v-if="task.dueDate && task.dueDate !== '-'"
@@ -238,9 +247,18 @@
           <!-- LEFT -->
           <div class="flex-1 overflow-y-auto px-6 py-5">
             <div class="flex items-start gap-3 mb-5">
+              <button @click="handleToggleComplete"
+                :title="selectedTask.is_completed ? 'Mark as incomplete' : 'Mark as complete'"
+                class="mt-1 w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition"
+                :class="selectedTask.is_completed
+                  ? 'bg-emerald-500 border-emerald-500 text-white'
+                  : 'border-gray-300 dark:border-gray-500 text-transparent hover:border-emerald-400 hover:text-emerald-400'">
+                <font-awesome-icon icon="check" class="text-xs" />
+              </button>
               <h2 contenteditable="true"
                 @blur="(e: FocusEvent) => handleTitleBlur((e.target as HTMLElement).innerText)"
-                class="text-xl font-bold text-gray-900 dark:text-gray-100 outline-none border-b-2 border-transparent focus:border-blue-400 flex-1 leading-tight">
+                class="text-xl font-bold outline-none border-b-2 border-transparent focus:border-blue-400 flex-1 leading-tight"
+                :class="selectedTask.is_completed ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-900 dark:text-gray-100'">
                 {{ selectedTask.title }}</h2>
             </div>
 
@@ -426,6 +444,7 @@
                   <input type="checkbox" :checked="sub.completed" @change="handleToggleSubtask(sub.id, !sub.completed)"
                     class="w-4 h-4 rounded accent-blue-600 cursor-pointer flex-shrink-0" />
                   <span contenteditable="true"
+                    @keydown.enter.prevent="(e: KeyboardEvent) => (e.target as HTMLElement).blur()"
                     @blur="(e: FocusEvent) => handleRenameSubtask(sub.id, sub.title, (e.target as HTMLElement).innerText)"
                     class="text-sm flex-1 outline-none border-b border-transparent focus:border-blue-400 transition dark:text-gray-200"
                     :class="sub.completed ? 'line-through text-gray-400' : 'text-gray-700'">
@@ -759,7 +778,7 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import {
   faClock, faPlay, faStop, faPlus, faTag, faCheckSquare, faPaperclip,
-  faAlignLeft, faEye, faImage, faEllipsisH, faTimes, faCommentAlt, faCheck, faUsers, faArrowLeft, faBoxArchive,
+  faAlignLeft, faEye, faImage, faEllipsisH, faTimes, faCommentAlt, faCheck, faUsers, faArrowLeft, faBoxArchive, faCircleCheck,
 } from '@fortawesome/free-solid-svg-icons'
 import {
   addComment as apiAddComment,
@@ -812,6 +831,7 @@ interface Task {
   title: string
   description?: string
   status?: string
+  is_completed?: boolean
   subtasks?: Subtask[]
   assignee_ids?: string[]
   activity: ActivityItem[]
@@ -822,7 +842,7 @@ interface Task {
   labelClass?: string
 }
 
-library.add(faClock, faPlay, faStop, faPlus, faTag, faCheckSquare, faPaperclip, faAlignLeft, faEye, faImage, faEllipsisH, faTimes, faCommentAlt, faCheck, faUsers, faArrowLeft, faBoxArchive)
+library.add(faClock, faPlay, faStop, faPlus, faTag, faCheckSquare, faPaperclip, faAlignLeft, faEye, faImage, faEllipsisH, faTimes, faCommentAlt, faCheck, faUsers, faArrowLeft, faBoxArchive, faCircleCheck)
 
 const route = useRoute()
 const router = useRouter()
@@ -1536,6 +1556,28 @@ function handleEllipsisAction(action: string) {
     return
   }
   if (action === 'delete') { handleDeleteTask(); return }
+}
+
+// Mark complete level card — keputusan user, TIDAK dihitung dari subtask.
+// Status HARUS dari backend: kalau request sukses, store & UI ikut berubah;
+// kalau gagal (endpoint set is_completed belum ada), UI TIDAK diubah (tidak
+// ada state palsu) dan user diberi tahu bahwa fitur menunggu backend.
+async function handleToggleComplete() {
+  if (!selectedTask.value) return
+  const next = !selectedTask.value.is_completed
+  try {
+    await store.setTaskCompleteInStore(selectedTask.value.id, next)
+    selectedTask.value.is_completed = next
+    logActivity(next ? 'menandai card selesai' : 'menandai card belum selesai')
+    showToast(next ? 'Card ditandai selesai.' : 'Tanda selesai dilepas.')
+  } catch (e: any) {
+    // Endpoint PATCH /tasks/{id}/complete belum tersedia (lihat BACKEND_REQUESTS.md).
+    if (e?.response?.status === 404 || e?.response?.status === 405) {
+      showToast('Fitur "mark complete" menunggu endpoint backend (PATCH /tasks/{id}/complete). Belum tersedia.')
+    } else {
+      showToast(apiErrorMessage(e, 'Gagal mengubah status selesai.'))
+    }
+  }
 }
 
 async function handleArchiveTask() {

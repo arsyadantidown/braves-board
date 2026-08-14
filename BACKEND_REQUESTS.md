@@ -32,6 +32,15 @@ Setiap poin menyertakan temuan kondisi saat ini + usulan konkret.
 opsi di card detail, dan Dashboard akan menghitung "Completed" dari
 `is_completed` (bukan dari subtask seperti sekarang).
 
+> **STATUS FRONTEND (sudah dipasang, menunggu backend):** UI mark-complete
+> sudah dibuat — tombol lingkaran centang di sebelah judul card + kartu hijau
+> transparan di column saat `is_completed == true`. Tombolnya **sudah
+> memanggil `PATCH /api/v1/tasks/{task_id}/complete` dengan body
+> `{ "is_completed": boolean }`** (Opsi A). Selama endpoint belum ada, tombol
+> gagal secara sengaja dan menampilkan pesan "menunggu endpoint backend"
+> (tidak ada state palsu / localStorage). **Mohon implementasikan Opsi A
+> dengan bentuk persis di atas** agar langsung berfungsi tanpa ubah frontend.
+
 ---
 
 ## 2. Edit / hapus Time Log + konsep "Project" — blokir fitur #8
@@ -125,6 +134,36 @@ response: sama seperti TaskListResponse (sudah ada field is_archived)
 ```
 Begitu tersedia, frontend akan memuat daftar archived dari backend (bukan dari
 localStorage) sehingga konsisten lintas device.
+
+---
+
+---
+
+## 5. Deadline per Subtask — dibutuhkan untuk fitur #1(b)
+
+**Kondisi sekarang**
+- `subtask_model.py` **tidak punya kolom tanggal/deadline** (hanya: id,
+  task_id, title, is_completed, position, timestamps).
+- `SubtaskCreateRequest` & `SubtaskUpdateRequest` **hanya menerima `title`**.
+- Endpoint **update judul subtask SUDAH ADA** (`PATCH /subtasks/{id}` dengan
+  `{ title }`) — frontend sudah memakainya untuk edit judul subtask. 👍
+
+**Yang dibutuhkan** agar bisa set & tampilkan deadline per subtask:
+- Tambah kolom pada `Subtask`:
+  ```
+  due_date: Mapped[datetime | None]  (nullable, timezone-aware)
+  ```
+- Terima `due_date` di request:
+  ```
+  SubtaskUpdateRequest: due_date: Optional[datetime] = None
+  (opsional juga di SubtaskCreateRequest)
+  ```
+- Kembalikan `due_date` di response subtask (`SubtaskNestedResponse` di
+  `task/schema.py` dan response subtask di `subtask/schema.py`).
+
+Begitu tersedia, frontend akan menambahkan date-picker per subtask di card
+detail + menampilkan badge deadline (overdue/soon), reuse util
+`due-date.util.ts` yang sudah ada.
 
 ---
 
