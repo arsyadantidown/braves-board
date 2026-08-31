@@ -1,5 +1,4 @@
 import uuid
-
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,6 +8,7 @@ from app.models.user_model import User
 from app.api.time_tracking.schema import (
     TimerPayload,
     TimerStopPayload,
+    TimeLogUpdate,
 )
 from app.api.time_tracking.use_cases import TimeTrackingUseCase
 from app.api.standard_response import success_response
@@ -59,6 +59,7 @@ async def start_timer(
 
     result = await use_case.start_timer(
         task_id,
+        current_user.id,
         description
     )
 
@@ -83,6 +84,7 @@ async def stop_timer(
 
     result = await use_case.stop_timer(
         task_id,
+        current_user.id,
         reason
     )
 
@@ -102,7 +104,10 @@ async def ping_timer(
         require_permission("task.update")
     ),
 ):
-    result = await use_case.ping(task_id)
+    result = await use_case.ping(
+        task_id,
+        current_user.id
+    )
 
     return success_response(result)
 
@@ -124,6 +129,53 @@ async def confirm_timer(
 
     return success_response(result)
 
+@router.patch(
+    "/{task_id}/timer/logs/{log_id}",
+    status_code=status.HTTP_200_OK
+)
+async def update_time_log(
+    task_id: uuid.UUID,
+    log_id: uuid.UUID,
+    payload: TimeLogUpdate,
+    use_case: TimeTrackingUseCase = Depends(
+        get_time_tracking_use_case
+    ),
+    current_user: User = Depends(
+        require_permission("task.update")
+    ),
+):
+    result = await use_case.update_time_log(
+        task_id=task_id,
+        log_id=log_id,
+        user_id=current_user.id,
+        start_time=payload.start_time,
+        stop_time=payload.stop_time,
+        activity_description=payload.activity_description,
+    )
+
+    return success_response(result)
+
+@router.delete(
+    "/{task_id}/timer/logs/{log_id}",
+    status_code=status.HTTP_200_OK
+)
+async def delete_time_log(
+    task_id: uuid.UUID,
+    log_id: uuid.UUID,
+    use_case: TimeTrackingUseCase = Depends(
+        get_time_tracking_use_case
+    ),
+    current_user: User = Depends(
+        require_permission("task.update")
+    ),
+):
+    result = await use_case.delete_time_log(
+        task_id=task_id,
+        log_id=log_id,
+        user_id=current_user.id,
+    )
+
+    return success_response(result)
 
 @router.get(
     "/{task_id}/timer/logs",
@@ -138,6 +190,10 @@ async def get_time_logs(
         require_permission("task.view")
     ),
 ):
-    result = await use_case.get_time_logs(task_id)
+    result = await use_case.get_time_logs(
+        task_id,
+        current_user.id
+    )
 
     return success_response(result)
+

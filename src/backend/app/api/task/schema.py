@@ -98,22 +98,6 @@ class TaskCreateRequest(BaseModel):
         return v
 
 
-class TaskListResponse(BaseModel):
-    id: uuid.UUID
-    title: str
-    position: int
-    due_date: Optional[datetime] = None
-    labels: Optional[List[str]] = None
-    assignee_ids: Optional[List[uuid.UUID]] = None
-    comment_count: int
-    attachment_count: int
-    is_timer_running: bool
-    is_completed: bool
-    total_duration: Optional[int] = 0
-
-    model_config = ConfigDict(from_attributes=True)
-
-
 class SubtaskNestedResponse(BaseModel):
     id: uuid.UUID
     title: str
@@ -208,6 +192,10 @@ class TaskUpdateRequest(BaseModel):
                 raise ValueError("Format tanggal tidak valid")
 
         return v
+
+
+class TaskCompleteRequest(BaseModel):
+    is_completed: bool
 
 
 class TaskMoveRequest(BaseModel):

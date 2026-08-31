@@ -14,6 +14,7 @@ from app.api.task.schema import (
     TaskCreate,
     TaskDetailResponse,
     TaskUpdateRequest,
+    TaskCompleteRequest,
     TaskMoveRequest,
     TaskMoveResponse,
     TaskReorderRequest,
@@ -88,6 +89,8 @@ class TaskUseCase:
     async def get_tasks_by_column(
         self,
         column_id: uuid.UUID,
+        archived: bool = False,
+        assignee_id: uuid.UUID | None = None,
     ):
         column = await self.column_repo.get_by_id(
             column_id
@@ -97,7 +100,9 @@ class TaskUseCase:
             raise ColumnNotFoundException()
 
         records = await self.task_repo.get_all_by_column_id_with_counts(
-            column_id
+            column_id,
+            archived,
+            assignee_id,
         )
 
         return [
@@ -178,6 +183,34 @@ class TaskUseCase:
 
         return {
             "id": updated_task.id,
+            "updated_at": updated_task.updated_at,
+        }
+
+    async def complete_task(
+        self,
+        task_id: uuid.UUID,
+        request: TaskCompleteRequest,
+    ):
+        task = await self.task_repo.get_by_id(
+            task_id
+        )
+
+        if not task:
+            raise TaskNotFoundException()
+
+        updated_task = await self.task_repo.update(
+            task_id,
+            {
+                "is_completed": request.is_completed,
+            },
+        )
+
+        if not updated_task:
+            raise TaskNotFoundException()
+
+        return {
+            "id": updated_task.id,
+            "is_completed": updated_task.is_completed,
             "updated_at": updated_task.updated_at,
         }
 

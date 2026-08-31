@@ -52,7 +52,9 @@ class TaskRepository:
 
     async def get_all_by_column_id_with_counts(
         self,
-        column_id: uuid.UUID
+        column_id: uuid.UUID,
+        archived: bool = False,
+        assignee_id: uuid.UUID | None = None,
     ):
         stmt = (
             select(
@@ -72,11 +74,16 @@ class TaskRepository:
             .where(
                 Task.column_id == column_id,
                 Task.deleted_at.is_(None),
-                Task.is_archived.is_(False),
+                Task.is_archived.is_(archived),
             )
             .group_by(Task.id)
             .order_by(Task.position)
         )
+
+        if assignee_id:
+            stmt = stmt.where(
+                Task.assignee_ids.any(assignee_id)
+            )
 
         result = await self.session.execute(stmt)
         return result.all()

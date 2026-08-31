@@ -1,18 +1,19 @@
 import uuid
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.connections.postgres import get_db
+
 from app.api.task.schema import (
     TaskCreateRequest,
     TaskUpdateRequest,
+    TaskCompleteRequest,
     TaskMoveRequest,
     TaskReorderRequest,
 )
+
 from app.api.task.use_cases import TaskUseCase
 from app.models.user_model import User
 from app.api.standard_response import success_response
-
 from app.core.dependencies import require_permission
 
 
@@ -28,16 +29,20 @@ def get_task_use_case(
 @router.get("", status_code=status.HTTP_200_OK)
 async def get_tasks(
     column_id: uuid.UUID,
+    archived: bool = False,
+    assignee_id: uuid.UUID | None = None,
     use_case: TaskUseCase = Depends(get_task_use_case),
     current_user: User = Depends(
         require_permission("task.view")
     ),
 ):
     result = await use_case.get_tasks_by_column(
-        column_id
+        column_id,
+        archived,
+        assignee_id,
     )
-    return success_response(result)
 
+    return success_response(result)
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_task(
@@ -89,6 +94,22 @@ async def unarchive_task(
 ):
     result = await use_case.unarchive_task(
         task_id
+    )
+    return success_response(result)
+
+
+@router.patch("/{task_id}/complete", status_code=status.HTTP_200_OK)
+async def complete_task(
+    task_id: uuid.UUID,
+    payload: TaskCompleteRequest,
+    use_case: TaskUseCase = Depends(get_task_use_case),
+    current_user: User = Depends(
+        require_permission("task.update")
+    ),
+):
+    result = await use_case.complete_task(
+        task_id,
+        payload,
     )
     return success_response(result)
 
