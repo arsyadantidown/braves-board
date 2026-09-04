@@ -16,6 +16,15 @@
             class="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white border-2 border-white"
             :class="m.color" :title="m.name">{{ m.initial }}</div>
         </div>
+        <button @click="toggleMyTasksFilter" :disabled="myTasksFilterLoading"
+          :aria-pressed="onlyMyTasks"
+          :title="onlyMyTasks ? 'Tampilkan semua task' : 'Tampilkan hanya task saya'"
+          class="flex items-center gap-1.5 text-xs border rounded-lg px-3 py-1.5 transition disabled:opacity-60"
+          :class="onlyMyTasks
+            ? 'border-blue-500 bg-blue-50 text-blue-600 dark:bg-blue-500/20 dark:border-blue-400 dark:text-blue-300'
+            : 'border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300'">
+          <font-awesome-icon icon="filter" /> My tasks
+        </button>
         <button @click="showArchivedPanel = true"
           class="flex items-center gap-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition">
           <font-awesome-icon icon="box-archive" /> Archived
@@ -67,12 +76,14 @@
         <!-- Task Cards -->
         <!-- Task Cards -->
         <div class="flex-1 overflow-y-auto px-2.5 py-2">
-          <div v-if="!board.tasks?.length" class="text-xs text-gray-400 dark:text-gray-500 text-center py-8">No tasks</div>
+          <div v-if="!visibleTaskCount(board)" class="text-xs text-gray-400 dark:text-gray-500 text-center py-8">
+            {{ onlyMyTasks && board.tasks?.length ? 'Tidak ada task untukmu' : 'No tasks' }}
+          </div>
 
           <VueDraggable v-model="board.tasks" group="tasks" :data-column-id="board.id" :animation="150"
             ghost-class="opacity-40" chosen-class="shadow-lg" class="flex flex-col gap-2 min-h-[40px]"
             @end="onTaskDragEnd">
-            <div v-for="task in (board.tasks as Task[])" :key="task.id" :data-id="task.id"
+            <div v-for="task in (board.tasks as Task[])" v-show="isTaskVisible(task)" :key="task.id" :data-id="task.id"
               class="rounded-lg border p-3 cursor-grab active:cursor-grabbing hover:border-blue-400 hover:shadow-md transition-all group"
               :class="task.is_completed
                 ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-600/50'
@@ -789,7 +800,7 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { library } from '@fortawesome/fontawesome-svg-core'
 import {
   faClock, faPlay, faStop, faPlus, faTag, faCheckSquare, faPaperclip,
-  faAlignLeft, faEye, faImage, faEllipsisH, faTimes, faCommentAlt, faCheck, faUsers, faArrowLeft, faBoxArchive, faCircleCheck,
+  faAlignLeft, faEye, faImage, faEllipsisH, faTimes, faCommentAlt, faCheck, faUsers, faArrowLeft, faBoxArchive, faCircleCheck, faFilter,
 } from '@fortawesome/free-solid-svg-icons'
 import {
   addComment as apiAddComment,
@@ -853,7 +864,7 @@ interface Task {
   labelClass?: string
 }
 
-library.add(faClock, faPlay, faStop, faPlus, faTag, faCheckSquare, faPaperclip, faAlignLeft, faEye, faImage, faEllipsisH, faTimes, faCommentAlt, faCheck, faUsers, faArrowLeft, faBoxArchive, faCircleCheck)
+library.add(faClock, faPlay, faStop, faPlus, faTag, faCheckSquare, faPaperclip, faAlignLeft, faEye, faImage, faEllipsisH, faTimes, faCommentAlt, faCheck, faUsers, faArrowLeft, faBoxArchive, faCircleCheck, faFilter)
 
 const route = useRoute()
 const router = useRouter()
@@ -864,6 +875,44 @@ const boards = computed(() => columnsByBoard.value[boardId] ?? [])
 
 const { user: currentUser, fetchCurrentUser } = useAuth()
 const currentBoard = computed(() => boardList.value.find((b: any) => b.id === boardId))
+
+// ─── Filter: "My tasks" ───────────────────────────────────────
+// Sumber kebenaran "task mana milik saya" = BACKEND (GET /tasks?assignee_id=...).
+// myTaskIds diisi dari jawaban backend; kartu hanya di-v-show berdasarkan set
+// itu. col.tasks TIDAK diubah → drag-drop, badge, dan persist columnsByBoard
+// tetap utuh. State ini sengaja tidak di-persist (filter reset saat reload).
+const onlyMyTasks = ref(false)
+const myTaskIds = ref<Set<string>>(new Set())
+const myTasksFilterLoading = ref(false)
+
+function isTaskVisible(task: { id: string }) {
+  return !onlyMyTasks.value || myTaskIds.value.has(task.id)
+}
+
+function visibleTaskCount(board: { tasks?: { id: string }[] }) {
+  const tasks = board.tasks ?? []
+  return onlyMyTasks.value ? tasks.filter(t => myTaskIds.value.has(t.id)).length : tasks.length
+}
+
+async function toggleMyTasksFilter() {
+  if (myTasksFilterLoading.value) return
+  if (onlyMyTasks.value) {
+    onlyMyTasks.value = false
+    myTaskIds.value = new Set()
+    return
+  }
+  const myId = currentUser.value?.id
+  if (!myId) { showToast('Data user belum termuat, coba lagi sebentar.'); return }
+  myTasksFilterLoading.value = true
+  try {
+    myTaskIds.value = await store.fetchTaskIdsByAssignee(boardId, myId)
+    onlyMyTasks.value = true
+  } catch (e: any) {
+    showToast(apiErrorMessage(e, 'Gagal memuat filter task.'))
+  } finally {
+    myTasksFilterLoading.value = false
+  }
+}
 
 // ─── Task State ───────────────────────────────────────────────
 const newTaskTitle = ref('')

@@ -5,8 +5,13 @@ import http from '../../../app/api'
 // Semua call di bawah HARUS menyertakan board_id, atau backend balas 422
 // "board_id: Field required".
 
-export async function getTasks(columnId: string, boardId: string) {
-  const res = await http.get('/tasks', { params: { column_id: columnId, board_id: boardId } })
+// assigneeId opsional → backend GET /tasks mendukung filter ?assignee_id=...
+// (commit backend "add task filter by assignee": Task.assignee_ids.any(id)).
+// Hanya dikirim kalau ada, supaya perilaku default (semua task) tidak berubah.
+export async function getTasks(columnId: string, boardId: string, assigneeId?: string) {
+  const params: Record<string, string> = { column_id: columnId, board_id: boardId }
+  if (assigneeId) params.assignee_id = assigneeId
+  const res = await http.get('/tasks', { params })
   return res.data?.data ?? res.data ?? []
 }
 

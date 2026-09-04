@@ -235,6 +235,24 @@ export const useAppStore = defineStore('app', () => {
     if (col) col.tasks = normalizeTaskList(tasks)
   }
 
+  // Kembalikan SET id task yang di-assign ke assigneeId, sesuai jawaban backend
+  // (GET /tasks?assignee_id=...). Keputusan "task ini milik siapa" ADA DI
+  // BACKEND — kita tidak menghitung ulang assignee di klien. View memakai set
+  // ini untuk menyembunyikan/menampilkan kartu tanpa mengubah col.tasks, jadi
+  // data kartu (subtask/attachment/timer) yang tidak ada di response list
+  // /tasks tetap utuh dan columnsByBoard yang di-persist tidak ikut tersaring.
+  async function fetchTaskIdsByAssignee(boardId: string, assigneeId: string): Promise<Set<string>> {
+    const cols = columnsByBoard.value[boardId] ?? []
+    const results = await Promise.all(
+      cols.map((col: any) => getTasks(col.id, boardId, assigneeId)),
+    )
+    const ids = new Set<string>()
+    for (const tasks of results) {
+      for (const t of tasks) ids.add(t.id)
+    }
+    return ids
+  }
+
   async function addTask(columnId: string, title: string) {
     const boardId = findBoardIdForColumn(columnId)
     if (!boardId) throw new Error('Board tidak ditemukan untuk column ini.')
@@ -411,7 +429,7 @@ export const useAppStore = defineStore('app', () => {
     columnsByBoard, fetchColumns, addColumn, blockedBoardIds,
     archivedByBoard, archiveTaskInStore, unarchiveTaskInStore, setTaskCompleteInStore,
     findBoardIdForColumn, findBoardIdForTask,
-    fetchTasks, addTask, editTask, removeTask, moveTaskToColumn, addSubtask, toggleSubtask, renameSubtask, removeSubtask,
+    fetchTasks, fetchTaskIdsByAssignee, addTask, editTask, removeTask, moveTaskToColumn, addSubtask, toggleSubtask, renameSubtask, removeSubtask,
   }
 }, {
   persist: {
