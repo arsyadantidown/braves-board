@@ -7,19 +7,19 @@
 
     <!-- Stats -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-      <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+      <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
         <p class="text-xs text-gray-400 dark:text-gray-500 mb-1">Total Boards</p>
         <p class="text-2xl font-bold text-gray-800 dark:text-gray-100">{{ boards.length }}</p>
       </div>
-      <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+      <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
         <p class="text-xs text-gray-400 dark:text-gray-500 mb-1">My Tasks</p>
         <p class="text-2xl font-bold text-gray-800 dark:text-gray-100">{{ myTasks.length }}</p>
       </div>
-      <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+      <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
         <p class="text-xs text-gray-400 dark:text-gray-500 mb-1">Completed</p>
         <p class="text-2xl font-bold text-emerald-500">{{ completedCount }}</p>
       </div>
-      <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+      <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
         <p class="text-xs text-gray-400 dark:text-gray-500 mb-1">This Week</p>
         <p class="text-2xl font-bold text-blue-500">
           {{ weeklyTimeLoading ? '…' : formatTimer(weeklySeconds) }}
@@ -27,8 +27,56 @@
       </div>
     </div>
 
+    <!-- Quick actions -->
+    <section class="mb-8">
+      <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-4">Quick Actions</h2>
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <router-link to="/boards"
+          class="group flex items-center gap-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-blue-400 dark:hover:border-blue-500 active:translate-y-0 active:scale-[0.98] active:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">
+          <div class="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-500/15 flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-110">
+            <svg class="w-5 h-5 text-blue-500 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+            </svg>
+          </div>
+          <div class="min-w-0">
+            <p class="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">Boards</p>
+            <p class="text-xs text-gray-400 dark:text-gray-500 truncate">Manage your boards</p>
+          </div>
+        </router-link>
+
+        <router-link to="/tracker"
+          class="group flex items-center gap-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-emerald-400 dark:hover:border-emerald-500 active:translate-y-0 active:scale-[0.98] active:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60">
+          <div class="w-10 h-10 rounded-lg bg-emerald-50 dark:bg-emerald-500/15 flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-110">
+            <svg class="w-5 h-5 text-emerald-500 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div class="min-w-0">
+            <p class="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">Time Tracker</p>
+            <p class="text-xs text-gray-400 dark:text-gray-500 truncate">Track your time</p>
+          </div>
+        </router-link>
+
+        <router-link to="/reports"
+          class="group flex items-center gap-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-purple-400 dark:hover:border-purple-500 active:translate-y-0 active:scale-[0.98] active:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/60">
+          <div class="w-10 h-10 rounded-lg bg-purple-50 dark:bg-purple-500/15 flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-110">
+            <svg class="w-5 h-5 text-purple-500 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          </div>
+          <div class="min-w-0">
+            <p class="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">Reports</p>
+            <p class="text-xs text-gray-400 dark:text-gray-500 truncate">View your reports</p>
+          </div>
+        </router-link>
+      </div>
+    </section>
+
     <!-- My Tasks -->
-    <div class="mb-8">
+    <section class="mb-8">
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-200">My Tasks</h2>
         <span class="text-xs text-gray-400 dark:text-gray-500">Card yang meng-assign Anda</span>
@@ -43,7 +91,7 @@
       </div>
       <div v-else class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700 overflow-hidden">
         <router-link v-for="t in myTasks" :key="t.id" :to="`/boards/${t.boardId}`"
-          class="flex items-center gap-4 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
+          class="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
           <div class="flex-1 min-w-0">
             <p class="text-sm text-gray-800 dark:text-gray-100 font-medium truncate">{{ t.title }}</p>
             <div class="flex items-center gap-2 mt-1 flex-wrap">
@@ -59,8 +107,8 @@
           <!-- Progress dari subtask selesai -->
           <div class="w-32 flex-shrink-0" v-if="t.subtaskTotal > 0">
             <div class="flex items-center justify-between mb-1">
-              <span class="text-[10px] text-gray-400">{{ t.subtaskDone }}/{{ t.subtaskTotal }}</span>
-              <span class="text-[10px] font-semibold text-gray-500">{{ t.progress }}%</span>
+              <span class="text-[10px] text-gray-400 dark:text-gray-500">{{ t.subtaskDone }}/{{ t.subtaskTotal }}</span>
+              <span class="text-[10px] font-semibold text-gray-500 dark:text-gray-400">{{ t.progress }}%</span>
             </div>
             <div class="bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
               <div class="h-1.5 rounded-full transition-all"
@@ -71,55 +119,7 @@
           <span v-else class="w-32 flex-shrink-0 text-[10px] text-gray-300 dark:text-gray-600 text-right">No subtasks</span>
         </router-link>
       </div>
-    </div>
-
-    <!-- Quick actions -->
-    <div>
-      <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-4">Quick Actions</h2>
-      <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <router-link to="/boards"
-          class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:border-blue-400 hover:shadow-sm transition flex items-center gap-3">
-          <div class="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
-            <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-            </svg>
-          </div>
-          <div>
-            <p class="text-sm font-medium text-gray-700 dark:text-gray-200">Boards</p>
-            <p class="text-xs text-gray-400 dark:text-gray-500">Manage your boards</p>
-          </div>
-        </router-link>
-
-        <router-link to="/tracker"
-          class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:border-blue-400 hover:shadow-sm transition flex items-center gap-3">
-          <div class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
-            <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <div>
-            <p class="text-sm font-medium text-gray-700 dark:text-gray-200">Time Tracker</p>
-            <p class="text-xs text-gray-400 dark:text-gray-500">Track your time</p>
-          </div>
-        </router-link>
-
-        <router-link to="/reports"
-          class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:border-blue-400 hover:shadow-sm transition flex items-center gap-3">
-          <div class="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center">
-            <svg class="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-          </div>
-          <div>
-            <p class="text-sm font-medium text-gray-700 dark:text-gray-200">Reports</p>
-            <p class="text-xs text-gray-400 dark:text-gray-500">View your reports</p>
-          </div>
-        </router-link>
-      </div>
-    </div>
+    </section>
   </AppLayout>
 </template>
 
