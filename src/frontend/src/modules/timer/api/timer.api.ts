@@ -33,3 +33,30 @@ export async function getTimerLogs(taskId: string, boardId: string): Promise<Tim
   const logs = data.logs ?? []
   return Array.isArray(logs) ? logs : []
 }
+
+export interface TimeLogUpdatePayload {
+  start_time?: string
+  stop_time?: string
+  activity_description?: string
+}
+
+// Edit satu time log. Backend: PATCH /tasks/{task_id}/timer/logs/{log_id}
+// (semua field opsional). duration_seconds DIHITUNG ULANG oleh backend, dan
+// HANYA saat stop_time ikut dikirim — karena itu pemanggil sebaiknya kirim
+// start_time + stop_time bersamaan supaya durasi selalu konsisten.
+export async function updateTimeLog(
+  taskId: string,
+  logId: string,
+  boardId: string,
+  payload: TimeLogUpdatePayload,
+): Promise<TimerLog> {
+  const res = await http.patch(`/tasks/${taskId}/timer/logs/${logId}`, payload, {
+    params: { board_id: boardId },
+  })
+  return res.data?.data ?? res.data
+}
+
+// Hapus satu time log. Backend: DELETE /tasks/{task_id}/timer/logs/{log_id}.
+export async function deleteTimeLog(taskId: string, logId: string, boardId: string): Promise<void> {
+  await http.delete(`/tasks/${taskId}/timer/logs/${logId}`, { params: { board_id: boardId } })
+}

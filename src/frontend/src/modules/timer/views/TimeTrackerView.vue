@@ -104,7 +104,7 @@
         </div>
         <div class="divide-y divide-gray-50 dark:divide-gray-700/60">
           <div v-for="entry in group.entries" :key="entry.id"
-            class="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition">
+            class="group flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition">
             <div class="flex-1 min-w-0">
               <router-link :to="`/boards/${entry.boardId}`" class="text-sm text-gray-800 dark:text-gray-100 font-medium truncate block hover:text-blue-600 transition">
                 {{ entry.taskTitle }}
@@ -125,15 +125,88 @@
             <span class="text-sm font-mono font-semibold text-gray-700 dark:text-gray-200 min-w-[70px] text-right flex-shrink-0">
               {{ entry.durationSeconds != null ? formatTimer(entry.durationSeconds) : '—' }}
             </span>
+            <div class="flex items-center gap-1 flex-shrink-0 w-[60px] justify-end">
+              <template v-if="entry.stopTime">
+                <button @click="openEditEntry(entry)" title="Edit entry"
+                  class="opacity-0 group-hover:opacity-100 focus:opacity-100 w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/20 transition">
+                  <font-awesome-icon icon="pen" class="text-xs" />
+                </button>
+                <button @click="openDeleteEntry(entry)" title="Hapus entry"
+                  class="opacity-0 group-hover:opacity-100 focus:opacity-100 w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/20 transition">
+                  <font-awesome-icon icon="trash" class="text-xs" />
+                </button>
+              </template>
+              <span v-else class="text-[10px] text-emerald-500 font-medium">berjalan</span>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Gap notice: backend belum expose endpoint update/delete time log -->
+    <!-- Catatan: entry manual (tanpa start/stop realtime) belum tersedia —
+         backend belum expose endpoint POST untuk membuat time log manual. -->
     <p class="text-xs text-gray-400 dark:text-gray-500 mt-6 text-center">
-      Riwayat waktu di halaman ini read-only — backend belum menyediakan endpoint untuk mengubah atau menghapus entry yang sudah tercatat.
+      Arahkan kursor ke sebuah entry untuk mengubah atau menghapusnya.
     </p>
+
+    <!-- Edit time log -->
+    <Teleport to="body">
+      <div v-if="editingEntry" class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        @click.self="closeEditEntry">
+        <div class="absolute inset-0 bg-black/40" @click="closeEditEntry" />
+        <div class="relative bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-5">
+          <h2 class="text-base font-bold text-gray-800 dark:text-gray-100 mb-1">Edit time entry</h2>
+          <p class="text-xs text-gray-400 dark:text-gray-500 mb-4 truncate">{{ editingEntry.taskTitle }}</p>
+
+          <label class="block text-[11px] text-gray-400 dark:text-gray-500 mb-1">Waktu mulai</label>
+          <input type="datetime-local" v-model="editStart"
+            class="w-full text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-2.5 py-1.5 mb-3 outline-none focus:border-blue-400 transition bg-white dark:bg-gray-700 dark:text-gray-100" />
+
+          <label class="block text-[11px] text-gray-400 dark:text-gray-500 mb-1">Waktu selesai</label>
+          <input type="datetime-local" v-model="editStop"
+            class="w-full text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-2.5 py-1.5 mb-3 outline-none focus:border-blue-400 transition bg-white dark:bg-gray-700 dark:text-gray-100" />
+
+          <label class="block text-[11px] text-gray-400 dark:text-gray-500 mb-1">Deskripsi aktivitas</label>
+          <input type="text" v-model="editDescription" placeholder="Opsional…"
+            class="w-full text-sm border border-gray-200 dark:border-gray-600 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-400 transition placeholder-gray-400 bg-white dark:bg-gray-700 dark:text-gray-100" />
+
+          <p class="text-[11px] text-gray-400 dark:text-gray-500 mt-2">Durasi dihitung ulang otomatis oleh server.</p>
+          <p v-if="editError" class="text-xs text-red-500 mt-2">{{ editError }}</p>
+
+          <div class="flex justify-end gap-2 mt-5">
+            <button @click="closeEditEntry"
+              class="text-sm px-3 py-1.5 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition">Batal</button>
+            <button @click="saveEditEntry" :disabled="editSaving"
+              class="text-sm px-4 py-1.5 rounded-lg font-semibold bg-blue-500 hover:bg-blue-600 text-white transition disabled:opacity-50">
+              {{ editSaving ? 'Menyimpan…' : 'Simpan' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Konfirmasi hapus time log -->
+    <Teleport to="body">
+      <div v-if="deletingEntry" class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        @click.self="closeDeleteEntry">
+        <div class="absolute inset-0 bg-black/40" @click="closeDeleteEntry" />
+        <div class="relative bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 w-full max-w-sm p-5">
+          <h2 class="text-base font-bold text-gray-800 dark:text-gray-100 mb-1">Hapus time entry?</h2>
+          <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            Entry <span class="font-medium text-gray-700 dark:text-gray-200">{{ deletingEntry.taskTitle }}</span>
+            akan dihapus permanen. Aksi ini tidak bisa dibatalkan.
+          </p>
+          <div class="flex justify-end gap-2">
+            <button @click="closeDeleteEntry"
+              class="text-sm px-3 py-1.5 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition">Batal</button>
+            <button @click="confirmDeleteEntry" :disabled="deleteLoading"
+              class="text-sm px-4 py-1.5 rounded-lg font-semibold bg-red-500 hover:bg-red-600 text-white transition disabled:opacity-50">
+              {{ deleteLoading ? 'Menghapus…' : 'Hapus' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
     <Teleport to="body">
       <Transition name="toast">
@@ -150,15 +223,15 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import AppLayout from '../../../components/common/AppLayout.vue'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { library } from '@fortawesome/fontawesome-svg-core'
-import { faTag, faCalendar, faClock } from '@fortawesome/free-solid-svg-icons'
-import { stopTimer, getTimerLogs } from '../api/timer.api'
+import { faTag, faCalendar, faClock, faPen, faTrash } from '@fortawesome/free-solid-svg-icons'
+import { stopTimer, getTimerLogs, updateTimeLog, deleteTimeLog } from '../api/timer.api'
 import { formatTimer, formatClock, formatStopReason } from '../utils/timer.format'
 import { resolveDateRange, isWithinRange, dayKey, formatDayHeading, type DateRangePreset } from '../utils/date-range.util'
 import { useAppStore } from '../../board/store/board.store'
 import { storeToRefs } from 'pinia'
 import { useAuth } from '../../../composables/useAuth'
 
-library.add(faTag, faCalendar, faClock)
+library.add(faTag, faCalendar, faClock, faPen, faTrash)
 
 interface TimeEntry {
   id: string
@@ -242,6 +315,103 @@ async function handleStopActiveTimer() {
     showToast(e?.response?.data?.error?.message || 'Gagal menghentikan timer.')
   } finally {
     stopLoading.value = false
+  }
+}
+
+// ─── Edit / Hapus time log (ala Clockify) ──────────────────────
+// Semua perubahan lewat backend (PATCH/DELETE /tasks/{id}/timer/logs/{logId})
+// lalu loadEntries() menarik ulang dari server → tidak ada state palsu, total
+// & daftar konsisten setelah refresh. Backend menghitung ulang durasi (dan
+// hanya saat stop_time dikirim), jadi kita selalu kirim start+stop bersamaan.
+// Hanya entry yang SUDAH selesai (punya stopTime) yang bisa diedit/dihapus —
+// entry yang masih berjalan dihentikan dulu lewat tombol Stop.
+const editingEntry = ref<TimeEntry | null>(null)
+const editStart = ref('')
+const editStop = ref('')
+const editDescription = ref('')
+const editError = ref('')
+const editSaving = ref(false)
+
+const deletingEntry = ref<TimeEntry | null>(null)
+const deleteLoading = ref(false)
+
+// ISO → nilai <input type="datetime-local"> (waktu lokal, tanpa detik).
+function isoToLocalInput(iso: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function openEditEntry(entry: TimeEntry) {
+  editingEntry.value = entry
+  editStart.value = isoToLocalInput(entry.startTime)
+  editStop.value = isoToLocalInput(entry.stopTime)
+  editDescription.value = entry.activityDescription ?? ''
+  editError.value = ''
+}
+
+function closeEditEntry() {
+  editingEntry.value = null
+  editError.value = ''
+}
+
+async function saveEditEntry() {
+  if (!editingEntry.value || editSaving.value) return
+  if (!editStart.value || !editStop.value) {
+    editError.value = 'Waktu mulai dan selesai wajib diisi.'
+    return
+  }
+  const startMs = new Date(editStart.value).getTime()
+  const stopMs = new Date(editStop.value).getTime()
+  if (Number.isNaN(startMs) || Number.isNaN(stopMs)) {
+    editError.value = 'Format waktu tidak valid.'
+    return
+  }
+  if (stopMs <= startMs) {
+    editError.value = 'Waktu selesai harus setelah waktu mulai.'
+    return
+  }
+  editSaving.value = true
+  try {
+    const entry = editingEntry.value
+    await updateTimeLog(entry.taskId, entry.id, entry.boardId, {
+      start_time: new Date(editStart.value).toISOString(),
+      stop_time: new Date(editStop.value).toISOString(),
+      activity_description: editDescription.value.trim(),
+    })
+    closeEditEntry()
+    showToast('Time entry diperbarui.')
+    await loadEntries()
+  } catch (e: any) {
+    editError.value = e?.response?.data?.error?.message || 'Gagal memperbarui entry.'
+  } finally {
+    editSaving.value = false
+  }
+}
+
+function openDeleteEntry(entry: TimeEntry) {
+  deletingEntry.value = entry
+}
+
+function closeDeleteEntry() {
+  deletingEntry.value = null
+}
+
+async function confirmDeleteEntry() {
+  if (!deletingEntry.value || deleteLoading.value) return
+  deleteLoading.value = true
+  try {
+    const entry = deletingEntry.value
+    await deleteTimeLog(entry.taskId, entry.id, entry.boardId)
+    closeDeleteEntry()
+    showToast('Time entry dihapus.')
+    await loadEntries()
+  } catch (e: any) {
+    showToast(e?.response?.data?.error?.message || 'Gagal menghapus entry.')
+  } finally {
+    deleteLoading.value = false
   }
 }
 
