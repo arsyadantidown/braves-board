@@ -85,8 +85,19 @@
               </div>
 
               <div class="flex items-start gap-1.5 mb-2">
-                <font-awesome-icon v-if="task.is_completed" icon="circle-check"
-                  class="text-emerald-500 text-sm mt-0.5 flex-shrink-0" title="Completed" />
+                <!-- Toggle complete ala Trello: lingkaran hanya muncul saat hover
+                     kartu; kalau sudah completed centangnya tetap terlihat permanen.
+                     Klik TIDAK membuka card detail (stop propagation). Reuse penuh
+                     store.setTaskCompleteInStore — tidak ada logika/state baru. -->
+                <button type="button" @click.stop="handleCardToggleComplete(task)"
+                  :title="task.is_completed ? 'Mark as incomplete' : 'Mark as complete'"
+                  class="mt-0.5 flex-shrink-0 flex items-center justify-center w-[15px] h-[15px] rounded-full cursor-pointer transition-opacity duration-200 focus:outline-none focus-visible:opacity-100"
+                  :class="task.is_completed ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'">
+                  <font-awesome-icon v-if="task.is_completed" icon="circle-check"
+                    class="text-emerald-500 text-[15px]" />
+                  <span v-else
+                    class="block w-[15px] h-[15px] rounded-full border-2 border-gray-300 dark:border-gray-500 hover:border-emerald-500 dark:hover:border-emerald-400 transition-colors"></span>
+                </button>
                 <p class="text-sm leading-snug font-normal"
                   :class="task.is_completed ? 'text-emerald-800 dark:text-emerald-200' : 'text-gray-800 dark:text-gray-100'">
                   {{ task.title }}</p>
@@ -1572,6 +1583,23 @@ async function handleToggleComplete() {
     showToast(next ? 'Card ditandai selesai.' : 'Tanda selesai dilepas.')
   } catch (e: any) {
     // Endpoint PATCH /tasks/{id}/complete belum tersedia (lihat BACKEND_REQUESTS.md).
+    if (e?.response?.status === 404 || e?.response?.status === 405) {
+      showToast('Fitur "mark complete" menunggu endpoint backend (PATCH /tasks/{id}/complete). Belum tersedia.')
+    } else {
+      showToast(apiErrorMessage(e, 'Gagal mengubah status selesai.'))
+    }
+  }
+}
+
+// Toggle complete langsung dari kartu di column (tampilan board), ala Trello.
+// Reuse penuh store.setTaskCompleteInStore — task di v-for adalah objek yang
+// sama dengan yang di store, jadi is_completed ikut reaktif tanpa state palsu.
+async function handleCardToggleComplete(task: Task) {
+  const next = !task.is_completed
+  try {
+    await store.setTaskCompleteInStore(task.id, next)
+    showToast(next ? 'Card ditandai selesai.' : 'Tanda selesai dilepas.')
+  } catch (e: any) {
     if (e?.response?.status === 404 || e?.response?.status === 405) {
       showToast('Fitur "mark complete" menunggu endpoint backend (PATCH /tasks/{id}/complete). Belum tersedia.')
     } else {
