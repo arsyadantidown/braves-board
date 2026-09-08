@@ -840,6 +840,10 @@ interface ActivityItem {
   date: string
   comment?: { title: string; body: string }
   id?: string
+  // Epoch ms waktu comment dibuat — dipakai untuk mengurutkan tampilan comment
+  // (terbaru di atas). `date` di atas hanya string ter-format untuk tampilan,
+  // tidak bisa dibandingkan langsung, jadi sort HARUS pakai field numerik ini.
+  createdAt?: number
 }
 
 interface Subtask {
@@ -1015,10 +1019,13 @@ const assignedMembers = computed(() => resolveMembers(selectedTask.value?.assign
 // Feed gabungan `activity` dipisah jadi dua tab: item yang punya `.comment`
 // adalah komentar, sisanya (hanya `.action`) adalah log aktivitas. Index asli
 // dipertahankan karena handleDeleteComment memakai index ke selectedTask.activity.
+// Sort HANYA salinan tampilan (bukan array sumber) berdasarkan `createdAt`
+// (epoch ms) menurun — terbaru di atas — supaya index `i` tetap akurat.
 const commentItems = computed(() =>
   (selectedTask.value?.activity ?? [])
     .map((act, i) => ({ act, i }))
     .filter(({ act }) => !!act.comment)
+    .sort((a, b) => (b.act.createdAt ?? 0) - (a.act.createdAt ?? 0))
 )
 
 const activityItems = computed(() =>
@@ -1727,8 +1734,11 @@ async function loadPersistedComments(task: Task) {
         date: new Date(c.created_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
         comment: { title: 'Comment', body: c.content },
         id: c.id,
+        createdAt: new Date(c.created_at).getTime() || 0,
       }))
-      .sort((a: ActivityItem, b: ActivityItem) => (b.id ?? '').localeCompare(a.id ?? ''))
+      // Urutkan sumber berdasarkan waktu (terbaru dulu). Sebelumnya sort pakai
+      // `id.localeCompare` yang acak karena id bukan urut-waktu.
+      .sort((a: ActivityItem, b: ActivityItem) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
     // Pertahankan log aktivitas sesi (item tanpa .comment); ganti bagian komentar
     // dengan data backend agar tidak dobel dengan komentar yang tadi diketik.
     const sessionLogs = task.activity.filter(a => !a.comment)
@@ -1762,6 +1772,7 @@ async function handleAddComment() {
       author: 'You', initial: 'Y', color: 'bg-blue-500', action: '',
       date: new Date().toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
       comment: { title: 'Comment', body: content },
+      createdAt: Date.now(),
     })
     newComment.value = ''
     // Reconcile dengan backend supaya komentar baru dapat id asli (untuk delete).

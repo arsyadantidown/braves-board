@@ -140,6 +140,7 @@ interface MyTask {
   columnTitle: string
   title: string
   dueDate: string
+  isCompleted: boolean
   subtaskDone: number
   subtaskTotal: number
   progress: number
@@ -175,6 +176,7 @@ const myTasks = computed<MyTask[]>(() => {
           columnTitle: col.title,
           title: t.title,
           dueDate: t.dueDate,
+          isCompleted: t.is_completed ?? false,
           subtaskDone,
           subtaskTotal,
           progress: subtaskTotal > 0 ? Math.round((subtaskDone / subtaskTotal) * 100) : 0,
@@ -188,8 +190,11 @@ const myTasks = computed<MyTask[]>(() => {
   return result.sort((a, b) => rank[dueDateStatus(a.dueDate)] - rank[dueDateStatus(b.dueDate)])
 })
 
+// "Completed" dihitung dari field is_completed pada task (mark-as-complete di
+// board / card detail), BUKAN dari progress subtask. Progress subtask tetap
+// ditampilkan terpisah sebagai info di daftar My Tasks.
 const completedCount = computed(() =>
-  myTasks.value.filter(t => t.subtaskTotal > 0 && t.progress === 100).length
+  myTasks.value.filter(t => t.isCompleted).length
 )
 
 async function loadMyTasks() {
