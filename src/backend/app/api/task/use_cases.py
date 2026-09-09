@@ -9,6 +9,9 @@ from app.api.user.repository import UserRepository
 from app.api.notification.repository import NotificationRepository
 from app.api.notification.use_cases import NotificationUseCase
 
+from app.api.task_activity.use_cases import ActivityUseCase
+from app.models.user_model import User
+
 from app.api.task.schema import (
     TaskCreateRequest,
     TaskCreate,
@@ -38,6 +41,8 @@ class TaskUseCase:
         self.notification_use_case = NotificationUseCase(
             NotificationRepository(session)
         )
+
+        self.activity_use_case = ActivityUseCase(session)
 
     async def create_task(
         self,
@@ -142,13 +147,19 @@ class TaskUseCase:
         self,
         task_id: uuid.UUID,
         request: TaskUpdateRequest,
+        current_user: User,
     ):
-        task = await self.task_repo.get_by_id(
-            task_id
-        )
+        task = await self.task_repo.get_by_id(task_id)
 
         if not task:
             raise TaskNotFoundException()
+
+        # Snapshot old values before update
+        old_title = task.title
+        old_description = task.description
+        old_due_date = task.due_date
+        old_assignee_ids = set(task.assignee_ids or [])
+        old_labels = task.labels or []
 
         if request.assignee_ids is not None:
             users_valid = await self.user_repo.check_users_exist(
@@ -167,9 +178,137 @@ class TaskUseCase:
             update_data,
         )
 
+        if not updated_task:
+            raise TaskNotFoundException()
+
         column = await self.column_repo.get_by_id(
             updated_task.column_id
         )
+
+        if not column:
+            raise ColumnNotFoundException()
+
+        if (
+            "title" in update_data
+            and update_data["title"] != old_title
+        ):
+            await self.activity_use_case.create(
+                board_id=column.board_id,
+                user_id=current_user.id,
+                task_id=updated_task.id,
+                action="task_updated",
+                description=(
+                    f'{current_user.full_name} changed task title '
+                    f'from "{old_title}" to "{updated_task.title}"'
+                ),
+                details={
+                    "old_title": old_title,
+                    "new_title": updated_task.title,
+                },
+            )
+
+        if (
+            "description" in update_data
+            and update_data["description"] != old_description
+        ):
+            await self.activity_use_case.create(
+                board_id=column.board_id,
+                user_id=current_user.id,
+                task_id=updated_task.id,
+                action="task_updated",
+                description=(
+                    f'{current_user.full_name} changed task description'
+                ),
+                details={
+                    "old_description": old_description,
+                    "new_description": updated_task.description,
+                },
+            )
+
+        if (
+            "due_date" in update_data
+            and update_data["due_date"] != old_due_date
+        ):
+            new_due_date = updated_task.due_date
+
+            if old_due_date is None and new_due_date is not None:
+                action = "due_date_set"
+                description = (
+                    f'{current_user.full_name} set due date for '
+                    f'task "{updated_task.title}"'
+                )
+
+            elif old_due_date is not None and new_due_date is None:
+                action = "due_date_removed"
+                description = (
+                    f'{current_user.full_name} removed due date from '
+                    f'task "{updated_task.title}"'
+                )
+
+            else:
+                action = "due_date_changed"
+                description = (
+                    f'{current_user.full_name} changed due date for '
+                    f'task "{updated_task.title}"'
+                )
+
+            await self.activity_use_case.create(
+                board_id=column.board_id,
+                user_id=current_user.id,
+                task_id=updated_task.id,
+                action=action,
+                description=description,
+                details={
+                    "old_due_date": (
+                        old_due_date.isoformat()
+                        if old_due_date
+                        else None
+                    ),
+                    "new_due_date": (
+                        new_due_date.isoformat()
+                        if new_due_date
+                        else None
+                    ),
+                },
+            )
+
+        if "assignee_ids" in update_data:
+            new_assignee_ids = set(
+                updated_task.assignee_ids or []
+            )
+
+            added_assignees = new_assignee_ids - old_assignee_ids
+            removed_assignees = old_assignee_ids - new_assignee_ids
+
+            for user_id in added_assignees:
+                await self.activity_use_case.create(
+                    board_id=column.board_id,
+                    user_id=current_user.id,
+                    task_id=updated_task.id,
+                    action="task_assigned",
+                    description=(
+                        f'{current_user.full_name} assigned a member '
+                        f'to task "{updated_task.title}"'
+                    ),
+                    details={
+                        "assignee_id": str(user_id),
+                    },
+                )
+
+            for user_id in removed_assignees:
+                await self.activity_use_case.create(
+                    board_id=column.board_id,
+                    user_id=current_user.id,
+                    task_id=updated_task.id,
+                    action="task_unassigned",
+                    description=(
+                        f'{current_user.full_name} unassigned a member '
+                        f'from task "{updated_task.title}"'
+                    ),
+                    details={
+                        "assignee_id": str(user_id),
+                    },
+                )
 
         for user_id in updated_task.assignee_ids or []:
             await self.notification_use_case.create(
@@ -178,7 +317,9 @@ class TaskUseCase:
                 task_id=updated_task.id,
                 type="task_updated",
                 title="Task Updated",
-                message=f'Task "{updated_task.title}" has been updated.',
+                message=(
+                    f'Task "{updated_task.title}" has been updated.'
+                ),
             )
 
         return {
@@ -190,6 +331,7 @@ class TaskUseCase:
         self,
         task_id: uuid.UUID,
         request: TaskCompleteRequest,
+        current_user: User,
     ):
         task = await self.task_repo.get_by_id(
             task_id
@@ -207,6 +349,30 @@ class TaskUseCase:
 
         if not updated_task:
             raise TaskNotFoundException()
+
+        column = await self.column_repo.get_by_id(
+            updated_task.column_id
+        )
+
+        action = (
+            "task_completed"
+            if updated_task.is_completed
+            else "task_uncompleted"
+        )
+
+        description = (
+            f'{current_user.full_name} '
+            f'{"completed" if updated_task.is_completed else "uncompleted"} '
+            f'task "{updated_task.title}"'
+        )
+
+        await self.activity_use_case.create(
+            board_id=column.board_id,
+            user_id=current_user.id,
+            task_id=updated_task.id,
+            action=action,
+            description=description,
+        )
 
         return {
             "id": updated_task.id,
@@ -266,6 +432,7 @@ class TaskUseCase:
         self,
         task_id: uuid.UUID,
         request: TaskMoveRequest,
+        current_user: User,
     ):
         task = await self.task_repo.get_by_id(
             task_id
@@ -283,6 +450,10 @@ class TaskUseCase:
 
         old_column_id = task.column_id
         old_position = task.position
+
+        old_column = await self.column_repo.get_by_id(
+            old_column_id
+        )
 
         new_position = request.position
 
@@ -358,6 +529,26 @@ class TaskUseCase:
                 "position": new_position,
             },
         )
+
+        if not same_column:
+            await self.activity_use_case.create(
+                board_id=target_column.board_id,
+                user_id=current_user.id,
+                task_id=updated_task.id,
+                action="task_moved",
+                description=(
+                    f'{current_user.full_name} moved task '
+                    f'"{updated_task.title}" from '
+                    f'"{old_column.title}" to '
+                    f'"{target_column.title}"'
+                ),
+                details={
+                    "from_column_id": str(old_column.id),
+                    "from_column_name": old_column.title,
+                    "to_column_id": str(target_column.id),
+                    "to_column_name": target_column.title,
+                },
+            )
 
         for user_id in updated_task.assignee_ids or []:
 
