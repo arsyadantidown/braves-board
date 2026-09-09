@@ -10,6 +10,7 @@ from app.api.task_attachment.repository import TaskAttachmentRepository
 
 from app.api.notification.repository import NotificationRepository
 from app.api.notification.use_cases import NotificationUseCase
+from app.api.task_activity.use_cases import ActivityUseCase
 
 from app.lib.storage_util import StorageUtil
 
@@ -22,7 +23,6 @@ from app.api.exceptions.task_attachment_exceptions import (
     VideoTooLargeException,
 )
 
-
 ALLOWED_MIME_TYPES = {
     "image/jpeg": ("image", 10 * 1024 * 1024),
     "image/png": ("image", 10 * 1024 * 1024),
@@ -30,7 +30,6 @@ ALLOWED_MIME_TYPES = {
     "application/pdf": ("pdf", 50 * 1024 * 1024),
     "video/mp4": ("video", 1000 * 1024 * 1024),
 }
-
 
 class TaskAttachmentUseCase:
 
@@ -45,11 +44,13 @@ class TaskAttachmentUseCase:
             NotificationRepository(session)
         )
 
+        self.activity_use_case = ActivityUseCase(session)
 
     async def upload_file(
         self,
         task_id: uuid.UUID,
         file: UploadFile,
+        current_user,
     ):
 
         task = await self.task_repo.get_by_id(
@@ -67,9 +68,7 @@ class TaskAttachmentUseCase:
         if not file_info:
             raise InvalidFileTypeException()
 
-
         file_type, max_size = file_info
-
 
         file_size = getattr(file, "size", None)
 
@@ -77,7 +76,6 @@ class TaskAttachmentUseCase:
             file.file.seek(0, 2)
             file_size = file.file.tell()
             file.file.seek(0)
-
 
         if file_size > max_size:
 
@@ -90,8 +88,6 @@ class TaskAttachmentUseCase:
             elif file_type == "video":
                 raise VideoTooLargeException()
 
-
-
         filename = file.filename or "unknown_file"
 
         extension = (
@@ -100,18 +96,15 @@ class TaskAttachmentUseCase:
             else "bin"
         )
 
-
         path = (
             f"tasks/{task_id}/"
             f"{uuid.uuid4()}.{extension}"
         )
 
-
         file_url = self.storage_util.upload_file(
             file,
             path
         )
-
 
         attachment = await self.repository.create(
             TaskAttachmentCreate(
@@ -122,6 +115,22 @@ class TaskAttachmentUseCase:
             )
         )
 
+        await self.activity_use_case.create(
+            board_id=task.column.board_id,
+            user_id=current_user.id,
+            task_id=task.id,
+            action="attachment_added",
+            description=(
+                f'{current_user.full_name} attached file '
+                f'"{filename}" to task "{task.title}"'
+            ),
+            details={
+                "attachment_id": str(attachment.id),
+                "attachment_type": file_type,
+                "file_name": filename,
+                "file_url": file_url,
+            },
+        )
 
         await self._notify_attachment(
             task,
@@ -131,13 +140,12 @@ class TaskAttachmentUseCase:
 
         return attachment
 
-
-
     async def add_link(
         self,
         task_id: uuid.UUID,
         title: str | None,
         url: str,
+        current_user,
     ):
 
         task = await self.task_repo.get_by_id(
@@ -146,8 +154,6 @@ class TaskAttachmentUseCase:
 
         if not task:
             raise TaskNotFoundException()
-
-
 
         attachment = await self.repository.create(
             TaskAttachmentCreate(
@@ -162,16 +168,29 @@ class TaskAttachmentUseCase:
             )
         )
 
+        await self.activity_use_case.create(
+            board_id=task.column.board_id,
+            user_id=current_user.id,
+            task_id=task.id,
+            action="attachment_added",
+            description=(
+                f'{current_user.full_name} attached link '
+                f'"{attachment.file_name}" to task "{task.title}"'
+            ),
+            details={
+                "attachment_id": str(attachment.id),
+                "attachment_type": "link",
+                "title": attachment.file_name,
+                "url": url,
+            },
+        )
 
         await self._notify_attachment(
             task,
             attachment.file_name
         )
 
-
         return attachment
-
-
 
     async def _notify_attachment(
         self,
@@ -193,8 +212,6 @@ class TaskAttachmentUseCase:
                 ),
             )
 
-
-
     def generate_signed_url(
         self,
         file_url: str
@@ -204,11 +221,10 @@ class TaskAttachmentUseCase:
             file_url
         )
 
-
-
     async def delete_attachment(
         self,
-        attachment_id: uuid.UUID
+        attachment_id: uuid.UUID,
+        current_user,
     ):
 
         attachment = await self.repository.get_by_id(
@@ -218,16 +234,37 @@ class TaskAttachmentUseCase:
         if not attachment:
             return None
 
+        task = await self.task_repo.get_by_id(
+            attachment.task_id
+        )
+
+        if not task:
+            raise TaskNotFoundException()
 
         if attachment.type != "link":
             self.storage_util.delete_file(
                 attachment.file_url
             )
 
-
         await self.repository.delete(
             attachment_id
         )
 
+        await self.activity_use_case.create(
+            board_id=task.column.board_id,
+            user_id=current_user.id,
+            task_id=task.id,
+            action="attachment_deleted",
+            description=(
+                f'{current_user.full_name} deleted attachment '
+                f'"{attachment.file_name}" from task "{task.title}"'
+            ),
+            details={
+                "attachment_id": str(attachment.id),
+                "attachment_type": attachment.type,
+                "file_name": attachment.file_name,
+                "file_url": attachment.file_url,
+            },
+        )
 
         return attachment

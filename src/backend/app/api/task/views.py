@@ -110,6 +110,7 @@ async def complete_task(
     result = await use_case.complete_task(
         task_id,
         payload,
+        current_user,
     )
     return success_response(result)
 
@@ -126,6 +127,7 @@ async def update_task(
     result = await use_case.update_task(
         task_id,
         payload,
+        current_user,
     )
     return success_response(result)
 
@@ -142,9 +144,9 @@ async def move_task(
     result = await use_case.move_task(
         task_id,
         payload,
+        current_user,
     )
     return success_response(result)
-
 
 @router.patch("/{task_id}/reorder", status_code=status.HTTP_200_OK)
 async def reorder_task(

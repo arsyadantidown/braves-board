@@ -43,9 +43,11 @@ async def upload_task_attachment(
         require_permission("task.update")
     ),
 ):
+    
     attachment = await use_case.upload_file(
         task_id,
-        file
+        file,
+        current_user
     )
 
     attachment_dict = (
@@ -77,10 +79,12 @@ async def add_task_attachment_link(
         require_permission("task.update")
     ),
 ):
+    
     attachment = await use_case.add_link(
         task_id=task_id,
         title=request.title,
         url=str(request.url),
+        current_user=current_user,
     )
 
     attachment_dict = (
@@ -105,8 +109,10 @@ async def delete_attachment(
         require_permission("task.delete")
     ),
 ):
+    
     attachment = await use_case.delete_attachment(
-        id
+        id,
+        current_user
     )
 
     if not attachment:

@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from app.models.subtask_model import Subtask
     from app.models.task_comment_model import TaskComment
     from app.models.task_attachment_model import TaskAttachment
+    from app.models.activity_model import Activity
 
 class Task(Base):
     __tablename__ = "tasks"
@@ -39,3 +40,4 @@ class Task(Base):
     comments: Mapped[list["TaskComment"]] = relationship(back_populates="task")
     attachments: Mapped[list["TaskAttachment"]] = relationship(back_populates="task")
     notifications = relationship("Notification", back_populates="task")
+    activities: Mapped[list["Activity"]] = relationship(back_populates="task")
