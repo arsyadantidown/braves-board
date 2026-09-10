@@ -1767,6 +1767,17 @@ async function loadPersistedComments(task: Task) {
     // dengan data backend agar tidak dobel dengan komentar yang tadi diketik.
     const sessionLogs = task.activity.filter(a => !a.comment)
     task.activity = [...comments, ...sessionLogs]
+
+    // Attachment juga hanya ada di GET /tasks/{id} (list /tasks tidak mengirim
+    // arraynya), jadi WAJIB dipetakan di sini — kalau tidak, attachment hilang
+    // setelah refresh. Backend pakai file_name & file_url; FE pakai title & url.
+    // Simpan id & type asli supaya bisa dihapus (dan bedakan link vs file).
+    task.attachments = (detail?.attachments ?? []).map((a: any) => ({
+      id: a.id,
+      title: a.file_name,
+      type: a.type,
+      url: a.file_url,
+    }))
   } catch {
     // Diamkan — biarkan feed sesi apa adanya kalau gagal memuat.
   } finally {
@@ -1850,9 +1861,16 @@ async function handleAddLink() {
   if (!title || !url || !selectedTask.value?.id || attachLinkLoading.value) return
   attachLinkLoading.value = true
   try {
-    await apiAddLink(selectedTask.value.id, title, url, boardId)
+    // Pakai id dari response (backend mengembalikannya) — jangan set id: null,
+    // kalau null tombol hapus jadi no-op (handleDeleteAttachment guard !attachId).
+    const att = await apiAddLink(selectedTask.value.id, title, url, boardId)
     if (!selectedTask.value.attachments) selectedTask.value.attachments = []
-    selectedTask.value.attachments.push({ id: null, title, type: 'link', url })
+    selectedTask.value.attachments.push({
+      id: att?.id ?? null,
+      title: att?.file_name ?? title,
+      type: att?.type ?? 'link',
+      url: att?.file_url ?? url,
+    })
     logActivity(`attached link "${title}"`)
     showToast(`Link "${title}" added!`)
     attachLinkTitle.value = ''
