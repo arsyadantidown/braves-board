@@ -8,6 +8,7 @@ import {
   getUsers as apiGetUsers,
 } from '../api/board.api'
 import { getColumns, createColumn as apiCreateColumn } from '../api/column.api'
+import { mapLimit } from '../../../app/async'
 import {
   getTasks,
   createTask as apiCreateTask,
@@ -42,6 +43,10 @@ export const useAppStore = defineStore('app', () => {
     // itu. Prioritaskan res.boards dulu.
     boards.value = Array.isArray(res) ? res : res.boards ?? res.items ?? res.data ?? []
     boardsLoaded.value = true
+    // Daftar board barusan divalidasi ulang ke API. Kalau board yang tadinya
+    // 403 (transient) masih dikembalikan API, berarti akses sudah pulih —
+    // buang dari blocklist supaya fetchColumns mau mencoba lagi.
+    for (const b of boards.value) blockedBoardIds.value.delete(b.id)
   }
 
   async function addBoard(title: string) {
@@ -119,34 +124,51 @@ export const useAppStore = defineStore('app', () => {
   // list-archived yang dibutuhkan agar sinkron lintas device.
   const archivedByBoard = ref<Record<string, any[]>>({})
 
-  // Board yang sudah ketahuan 403 (bukan member lagi / akses dicabut).
-  // Sengaja TIDAK di-persist (lihat pick di bawah) — kalau user diundang
-  // lagi nanti, refresh halaman akan coba ulang secara wajar.
+  // Board yang 403 di sesi ini (akses sesaat dicabut / bukan member).
+  // Sengaja TIDAK di-persist — hanya penanda sementara agar endpoint columns
+  // tidak ditembak berulang dalam sesi berjalan. Dibersihkan otomatis saat
+  // fetchBoards() menemukan board itu masih dikembalikan API (akses pulih),
+  // dan hilang total saat reload (store mulai kosong lalu refetch dari API).
   const blockedBoardIds = ref<Set<string>>(new Set())
 
   async function fetchColumns(boardId: string, force = false) {
     if (blockedBoardIds.value.has(boardId)) {
-      // Board sudah ketahuan tidak bisa diakses — jangan tembak endpoint
-      // lagi (dulu ini yang bikin GET /columns?board_id=... 403 berulang
-      // tanpa henti tiap Dashboard/TimeTracker mount, karena boards.value
-      // hasil persist localStorage masih menyimpan board yang aksesnya
-      // sudah dicabut, dan fetch yang gagal tidak pernah ke-cache).
+      // Board sudah ketahuan tidak bisa diakses di sesi ini — jangan tembak
+      // endpoint lagi (mencegah GET /columns?board_id=... 403 berulang tiap
+      // Dashboard/TimeTracker mount). Ini hanya penyembunyian sementara;
+      // fetchBoards() akan mencabut blokir ini kalau akses sudah pulih.
       throw new Error('BOARD_ACCESS_BLOCKED')
     }
     if (columnsByBoard.value[boardId] && !force) return
     try {
       const cols = await getColumns(boardId)
-      columnsByBoard.value[boardId] = cols.map((col: any) => ({
+      // GET /columns TIDAK mengembalikan task sama sekali (backend
+      // column/use_cases.get_all_by_board_id hanya kirim id/title/position).
+      // Jadi task card HARUS diambil terpisah dari GET /tasks?column_id=...
+      // (task/use_cases.get_tasks_by_column) — endpoint itu mengembalikan
+      // SEMUA task non-archived TERMASUK yang is_completed=true. Dulu card
+      // hanya "ada" karena columnsByBoard di-persist ke localStorage; setelah
+      // localStorage tidak lagi jadi sumber, card wajib di-fetch dari API di
+      // sini, kalau tidak semua card (bukan cuma yang completed) akan hilang.
+      const taskLists = await mapLimit(cols, 4, (col: any) => getTasks(col.id, boardId))
+      columnsByBoard.value[boardId] = cols.map((col: any, i: number) => ({
         id: col.id,
         title: col.title,
-        tasks: normalizeTaskList(col.tasks ?? []),
+        // columnId dioper eksplisit: response GET /tasks tidak menyertakan
+        // column_id, padahal drag-drop & resolusi board butuh field itu.
+        tasks: normalizeTaskList(taskLists[i] ?? [], col.id),
       }))
     } catch (e: any) {
       console.error('fetchColumns RAW error:', e)
       if (e?.response?.status === 403) {
+        // 403 di sini kemungkinan besar transient (akses sesaat dicabut /
+        // race saat undangan diproses). Sembunyikan board HANYA untuk sesi
+        // berjalan lewat blockedBoardIds (in-memory, tidak di-persist) supaya
+        // endpoint columns tidak ditembak berulang. JANGAN hapus board dari
+        // boards.value — itu sumber data dari API; menghapusnya dulu bikin
+        // board hilang permanen dari UI. Cache column yang gagal dibuang saja.
         blockedBoardIds.value.add(boardId)
         delete columnsByBoard.value[boardId]
-        boards.value = boards.value.filter((b: any) => b.id !== boardId)
       }
       throw e
     }
@@ -161,6 +183,16 @@ export const useAppStore = defineStore('app', () => {
   }
 
   // ─── Tasks ────────────────────────────────────────────
+  // total_duration (detik) dari GET /tasks → string HH:MM:SS untuk tampilan
+  // timer di card. Card list memakai field `time`; detail nanti menimpanya.
+  function formatDuration(seconds: number): string {
+    const s = Math.max(0, Math.floor(seconds || 0))
+    const hh = String(Math.floor(s / 3600)).padStart(2, '0')
+    const mm = String(Math.floor((s % 3600) / 60)).padStart(2, '0')
+    const ss = String(s % 60).padStart(2, '0')
+    return `${hh}:${mm}:${ss}`
+  }
+
   function normalizeTask(task: any, columnId?: string) {
     return {
       id: task.id,
@@ -174,7 +206,7 @@ export const useAppStore = defineStore('app', () => {
       labels: task.labels ?? [],
       activity: task.activity ?? [],
       attachments: task.attachments ?? [],
-      time: task.time ?? '00:00:00',
+      time: task.time ?? (task.total_duration != null ? formatDuration(task.total_duration) : '00:00:00'),
       dueDate: task.due_date ?? task.dueDate ?? '-',
       label: task.label ?? null,
       labelClass: task.labelClass ?? null,
@@ -183,6 +215,12 @@ export const useAppStore = defineStore('app', () => {
       is_completed: task.is_completed ?? false,
       is_archived: task.is_archived ?? false,
       column_id: task.column_id ?? columnId ?? null,
+      // Dipakai untuk melewati fetch timer log yang pasti kosong: task yang
+      // total_duration=0 dan timernya tidak jalan tidak punya log sama sekali,
+      // jadi Dashboard/TimeTracker tak perlu menembak /tasks/{id}/timer/logs
+      // untuknya (mengurangi request ke bucket rate-limit /api/v1/tasks).
+      total_duration: task.total_duration ?? 0,
+      is_timer_running: task.is_timer_running ?? false,
     }
   }
 
@@ -243,9 +281,7 @@ export const useAppStore = defineStore('app', () => {
   // /tasks tetap utuh dan columnsByBoard yang di-persist tidak ikut tersaring.
   async function fetchTaskIdsByAssignee(boardId: string, assigneeId: string): Promise<Set<string>> {
     const cols = columnsByBoard.value[boardId] ?? []
-    const results = await Promise.all(
-      cols.map((col: any) => getTasks(col.id, boardId, assigneeId)),
-    )
+    const results = await mapLimit(cols, 4, (col: any) => getTasks(col.id, boardId, assigneeId))
     const ids = new Set<string>()
     for (const tasks of results) {
       for (const t of tasks) ids.add(t.id)
@@ -435,6 +471,16 @@ export const useAppStore = defineStore('app', () => {
   persist: {
     key: 'app-store',
     storage: localStorage,
-    pick: ['boards', 'boardsLoaded', 'columnsByBoard', 'archivedByBoard'],
+    // HANYA archivedByBoard yang di-persist: backend belum punya endpoint
+    // list-archived, jadi daftar task archived tidak bisa direfetch dari API.
+    //
+    // boards / boardsLoaded / columnsByBoard SENGAJA TIDAK di-persist lagi.
+    // Dulu mereka di-persist sehingga localStorage jadi "sumber kebenaran"
+    // dan flag boardsLoaded mencegah refetch — akibatnya (a) board yang
+    // dibuang saat 403 transient hilang permanen dari UI walau masih ada di
+    // DB, dan (b) data tidak pernah divalidasi ulang lintas device. Dengan
+    // tidak di-persist, store mulai kosong tiap app load dan otomatis fetch
+    // ulang dari API (API = sumber kebenaran, memori sesi = cache saja).
+    pick: ['archivedByBoard'],
   }
 })

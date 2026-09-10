@@ -132,6 +132,7 @@ import { useAuth } from '../../../composables/useAuth'
 import { dueDateStatus, dueDateBadgeClass } from '../../board/utils/due-date.util'
 import { getTimerLogs } from '../../timer/api/timer.api'
 import { formatTimer } from '../../timer/utils/timer.format'
+import { mapLimit } from '../../../app/async'
 
 interface MyTask {
   id: string
@@ -144,6 +145,8 @@ interface MyTask {
   subtaskDone: number
   subtaskTotal: number
   progress: number
+  // Petunjuk apakah task ini punya time log (untuk melewati fetch log kosong).
+  hasTimeTracked: boolean
 }
 
 const { user: currentUser, fetchCurrentUser } = useAuth()
@@ -180,6 +183,7 @@ const myTasks = computed<MyTask[]>(() => {
           subtaskDone,
           subtaskTotal,
           progress: subtaskTotal > 0 ? Math.round((subtaskDone / subtaskTotal) * 100) : 0,
+          hasTimeTracked: (t.total_duration ?? 0) > 0 || (t.is_timer_running ?? false),
         })
       }
     }
@@ -200,8 +204,18 @@ const completedCount = computed(() =>
 async function loadMyTasks() {
   tasksLoading.value = true
   try {
+    // TANPA force: localStorage tidak lagi dipakai (dihapus dari persist),
+    // jadi saat app di-reload store SUDAH kosong dan fetch ini otomatis kena
+    // API — data tetap dari DB. Yang dihindari di sini adalah force=true tiap
+    // mount: dulu itu membuat Dashboard, TimeTracker, dan board view sama-sama
+    // menembak /columns + /tasks untuk SEMUA board berulang kali (ledakan
+    // request → 429). Dengan memakai cache in-memory sesi, board yang sudah
+    // dimuat tidak di-fetch ulang saat pindah view.
     await store.fetchBoards()
-    await Promise.all(boards.value.map((b: any) => store.fetchColumns(b.id).catch(() => { })))
+    // Batasi paralelisme: fan-out ke semua board (masing-masing masih memuat
+    // /columns + /tasks per column) dibatasi biar tidak menembak backend
+    // serentak sampai kena 429.
+    await mapLimit(boards.value, 3, (b: any) => store.fetchColumns(b.id).catch(() => { }))
   } finally {
     tasksLoading.value = false
   }
@@ -213,13 +227,16 @@ async function loadMyTasks() {
 // waktu yang murni ditrack oleh user (TimeLog tidak punya field user_id),
 // tapi ini pendekatan terbaik yang bisa didapat dari API yang tersedia.
 async function loadWeeklyTime() {
-  if (!myTasks.value.length) { weeklySeconds.value = 0; return }
+  // Hanya task yang PUNYA waktu tercatat yang perlu ditarik lognya. Task
+  // dengan total_duration=0 & timer tidak jalan dijamin tak punya log — skip
+  // supaya tidak membuang jatah rate-limit /api/v1/tasks (20 req/60s) yang
+  // dipakai bersama GET /tasks?column_id di atas.
+  const tracked = myTasks.value.filter(t => t.hasTimeTracked)
+  if (!tracked.length) { weeklySeconds.value = 0; return }
   weeklyTimeLoading.value = true
   const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
   try {
-    const logSets = await Promise.all(
-      myTasks.value.map(t => getTimerLogs(t.id, t.boardId).catch(() => []))
-    )
+    const logSets = await mapLimit(tracked, 4, t => getTimerLogs(t.id, t.boardId).catch(() => []))
     let total = 0
     for (const logs of logSets) {
       for (const log of logs) {

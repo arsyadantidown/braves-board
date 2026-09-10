@@ -200,7 +200,9 @@ function formatCreatedAt(iso: string): string {
 async function fetchBoards() {
   loading.value = true
   try {
-    await store.fetchBoards()  // ← tidak fetch ulang kalau sudah ada
+    // force=true: selalu validasi ulang daftar board ke API saat view dimuat.
+    // API = sumber kebenaran; jangan bergantung pada cache boardsLoaded lama.
+    await store.fetchBoards(true)
   } catch {
     showToast('Gagal memuat boards.')
   } finally {

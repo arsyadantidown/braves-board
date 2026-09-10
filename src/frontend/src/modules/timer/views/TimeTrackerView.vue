@@ -230,6 +230,7 @@ import { resolveDateRange, isWithinRange, dayKey, formatDayHeading, type DateRan
 import { useAppStore } from '../../board/store/board.store'
 import { storeToRefs } from 'pinia'
 import { useAuth } from '../../../composables/useAuth'
+import { mapLimit } from '../../../app/async'
 
 library.add(faTag, faCalendar, faClock, faPen, faTrash)
 
@@ -430,8 +431,13 @@ async function loadEntries() {
 
   loading.value = true
   try {
+    // TANPA force: store sudah kosong tiap reload (localStorage tidak lagi
+    // dipakai), jadi data tetap datang dari API. Tapi kalau board/column-nya
+    // sudah dimuat Dashboard di sesi yang sama, cache in-memory dipakai ulang
+    // — tidak menembak /columns + /tasks untuk semua board lagi (hindari 429).
     await store.fetchBoards()
-    await Promise.all(boards.value.map((b: any) => store.fetchColumns(b.id).catch(() => { })))
+    // Fan-out ke semua board dibatasi paralelismenya biar tidak kena 429.
+    await mapLimit(boards.value, 3, (b: any) => store.fetchColumns(b.id).catch(() => { }))
 
     const involvedTasks: { taskId: string; taskTitle: string; boardId: string; boardTitle: string; columnTitle: string; labels: string[] }[] = []
     for (const board of boards.value) {
@@ -439,6 +445,10 @@ async function loadEntries() {
       for (const col of cols) {
         for (const t of col.tasks ?? []) {
           if (!t.assignee_ids?.includes(myId)) continue
+          // Task tanpa waktu tercatat (total_duration=0 & timer tidak jalan)
+          // pasti tidak punya time log → tidak perlu GET /tasks/{id}/timer/logs
+          // (hemat jatah rate-limit /api/v1/tasks 20 req/60s).
+          if (!((t.total_duration ?? 0) > 0 || t.is_timer_running)) continue
           involvedTasks.push({
             taskId: t.id,
             taskTitle: t.title,
@@ -451,9 +461,7 @@ async function loadEntries() {
       }
     }
 
-    const logSets = await Promise.all(
-      involvedTasks.map(t => getTimerLogs(t.taskId, t.boardId).catch(() => []))
-    )
+    const logSets = await mapLimit(involvedTasks, 4, t => getTimerLogs(t.taskId, t.boardId).catch(() => []))
 
     const entries: TimeEntry[] = []
     logSets.forEach((logs, i) => {

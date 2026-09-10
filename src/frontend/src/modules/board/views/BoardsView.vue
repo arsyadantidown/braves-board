@@ -40,8 +40,20 @@
 
     <div class="flex gap-3 overflow-x-auto pb-4 px-1" @click="openColumnMenuId = null">
 
+      <!-- Loading column (skeleton) — tampil saat fetch pertama dari API -->
+      <template v-if="columnsLoading && !columnsByBoard[boardId]?.length">
+        <div v-for="n in 3" :key="'skeleton-' + n"
+          class="min-w-[260px] max-w-[260px] flex flex-col rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 p-3 animate-pulse">
+          <div class="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
+          <div class="space-y-2">
+            <div class="h-14 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+            <div class="h-14 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+          </div>
+        </div>
+      </template>
+
       <!-- Column loop -->
-      <VueDraggable v-model="columnsByBoard[boardId]" :animation="150" ghost-class="opacity-40"
+      <VueDraggable v-else v-model="columnsByBoard[boardId]" :animation="150" ghost-class="opacity-40"
         chosen-class="shadow-lg" handle=".column-drag-handle" class="flex gap-3" @end="onColumnDragEnd">
         <div v-for="board in columnsByBoard[boardId]" :key="board.id"
           class="min-w-[260px] max-w-[260px] flex flex-col rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60"
@@ -880,6 +892,10 @@ const boards = computed(() => columnsByBoard.value[boardId] ?? [])
 const { user: currentUser, fetchCurrentUser } = useAuth()
 const currentBoard = computed(() => boardList.value.find((b: any) => b.id === boardId))
 
+// Loading column awal: sekarang column selalu diambil dari API saat view
+// dimuat, jadi ada jeda sebelum column tampil.
+const columnsLoading = ref(false)
+
 // ─── Filter: "My tasks" ───────────────────────────────────────
 // Sumber kebenaran "task mana milik saya" = BACKEND (GET /tasks?assignee_id=...).
 // myTaskIds diisi dari jawaban backend; kartu hanya di-v-show berdasarkan set
@@ -1408,13 +1424,21 @@ async function handleCreateTask(columnId: string) {
 // ─── Column ───────────────────────────────────────────────────
 async function initBoards() {
   if (!boardId) { showToast('Board ID tidak ditemukan.'); return }
+  columnsLoading.value = true
   try {
-    await store.fetchColumns(boardId)
+    // force=true DI SINI SAJA yang dipertahankan: membuka SATU board memang
+    // saat yang tepat untuk validasi ulang ke API, dan biayanya terbatas (1
+    // board = 1x /columns + N x /tasks) — bukan bagian dari ledakan request di
+    // halaman daftar/dashboard yang memuat SEMUA board. Jadi board yang sedang
+    // dibuka selalu fresh, tanpa memicu 429.
+    await store.fetchColumns(boardId, true)
     openTaskFromQuery()
   } catch (e: any) {
     console.error('fetchColumns error:', e?.response?.status, e?.response?.data)
     showToast('Akses ditolak atau Board tidak ditemukan.')
     router.replace('/boards')
+  } finally {
+    columnsLoading.value = false
   }
 }
 
@@ -1743,6 +1767,17 @@ async function loadPersistedComments(task: Task) {
     // dengan data backend agar tidak dobel dengan komentar yang tadi diketik.
     const sessionLogs = task.activity.filter(a => !a.comment)
     task.activity = [...comments, ...sessionLogs]
+
+    // Attachment juga hanya ada di GET /tasks/{id} (list /tasks tidak mengirim
+    // arraynya), jadi WAJIB dipetakan di sini — kalau tidak, attachment hilang
+    // setelah refresh. Backend pakai file_name & file_url; FE pakai title & url.
+    // Simpan id & type asli supaya bisa dihapus (dan bedakan link vs file).
+    task.attachments = (detail?.attachments ?? []).map((a: any) => ({
+      id: a.id,
+      title: a.file_name,
+      type: a.type,
+      url: a.file_url,
+    }))
   } catch {
     // Diamkan — biarkan feed sesi apa adanya kalau gagal memuat.
   } finally {
@@ -1826,9 +1861,16 @@ async function handleAddLink() {
   if (!title || !url || !selectedTask.value?.id || attachLinkLoading.value) return
   attachLinkLoading.value = true
   try {
-    await apiAddLink(selectedTask.value.id, title, url, boardId)
+    // Pakai id dari response (backend mengembalikannya) — jangan set id: null,
+    // kalau null tombol hapus jadi no-op (handleDeleteAttachment guard !attachId).
+    const att = await apiAddLink(selectedTask.value.id, title, url, boardId)
     if (!selectedTask.value.attachments) selectedTask.value.attachments = []
-    selectedTask.value.attachments.push({ id: null, title, type: 'link', url })
+    selectedTask.value.attachments.push({
+      id: att?.id ?? null,
+      title: att?.file_name ?? title,
+      type: att?.type ?? 'link',
+      url: att?.file_url ?? url,
+    })
     logActivity(`attached link "${title}"`)
     showToast(`Link "${title}" added!`)
     attachLinkTitle.value = ''
