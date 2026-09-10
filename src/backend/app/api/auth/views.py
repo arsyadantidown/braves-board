@@ -1,7 +1,6 @@
 import secrets
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Response, Cookie, Query, HTTPException
-from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from jose import jwt
 from fastapi.responses import RedirectResponse
@@ -17,7 +16,7 @@ from app.api.auth.schema import (
     AccessTokenData
 )
 from app.api.auth.use_cases import AuthUseCase
-from app.api.depedencies import get_current_user, security
+from app.api.depedencies import get_current_user
 from app.models.user_model import User
 from app.api.exceptions.auth_exceptions import (
     InvalidRefreshTokenException, 
@@ -83,7 +82,7 @@ async def google_callback(
     try:
         result = await AuthUseCase.handle_google_callback(code, oauth_nonce, user_repo)
 
-        redirect_url = f"{settings.FRONTEND_URL}/dashboard?access_token={result['access_token']}"
+        redirect_url = f"{settings.FRONTEND_URL}/dashboard"
         redirect_response = RedirectResponse(url=redirect_url)
 
         redirect_response.delete_cookie("oauth_state", path="/")
@@ -92,11 +91,11 @@ async def google_callback(
         redirect_response.set_cookie(
             key="access_token",
             value=result["access_token"],
-            httponly=False,
+            httponly=True,
             secure=settings.APP_ENV == "production",
             samesite="lax",
             path="/",
-            max_age=30,
+            max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         )
 
         redirect_response.set_cookie(
@@ -130,8 +129,9 @@ async def get_current_user_profile(current_user: User = Depends(get_current_user
         created_at=current_user.created_at,
     ))
 
-@router.post("/refresh", response_model=StandardResponse[AccessTokenData])
+@router.post("/refresh")
 async def refresh_token(
+    response: Response,
     refresh_token: str | None = Cookie(default=None),
     db: AsyncSession = Depends(get_db),
 ):
@@ -141,19 +141,30 @@ async def refresh_token(
     user_repo = UserRepository(db)
     result = await AuthUseCase.refresh_access_token(refresh_token, user_repo)
 
-    return success_response(AccessTokenData(
-        access_token=result["access_token"],
-        token_type="bearer",
-        expires_in=result["expires_in"],
-    ))
+    response.set_cookie(
+        key="access_token",
+        value=result["access_token"],
+        httponly=True,
+        secure=settings.APP_ENV == "production",
+        samesite="lax",
+        path="/",
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
+
+    return success_response({
+        "message": "Token refreshed successfully"
+    })
 
 @router.post("/logout", response_model=StandardResponse[LogoutData])
 async def logout(
     response: Response,
+    access_token: str | None = Cookie(default=None),
     current_user: User = Depends(get_current_user),
-    credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
-    token = credentials.credentials
+    if not access_token:
+        raise HTTPException(status_code=401, detail="Access token not found")
+
+    token = access_token
 
     payload = jwt.decode(
         token,
@@ -167,10 +178,18 @@ async def logout(
         raise HTTPException(status_code=400, detail="Invalid token payload")
 
     now_timestamp = int(datetime.now(timezone.utc).timestamp())
-    ttl = exp_timestamp - now_timestamp 
+    ttl = exp_timestamp - now_timestamp
 
     if ttl > 0:
         await redis_client.setex(f"blacklist:{token}", ttl, "true")
+
+    response.delete_cookie(
+        key="access_token",
+        path="/",
+        secure=settings.APP_ENV == "production",
+        httponly=True,
+        samesite="lax",
+    )
 
     response.delete_cookie(
         key="refresh_token",
@@ -180,4 +199,6 @@ async def logout(
         samesite="strict",
     )
 
-    return success_response(LogoutData(message=LogoutSuccessMessage.MESSAGE))
+    return success_response(
+        LogoutData(message=LogoutSuccessMessage.MESSAGE)
+    )

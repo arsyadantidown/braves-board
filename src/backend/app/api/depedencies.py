@@ -1,6 +1,5 @@
 import uuid
-from fastapi import Depends, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Depends, Request, Cookie
 from jose import jwt, JWTError, ExpiredSignatureError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,20 +15,18 @@ from app.api.exceptions.auth_exceptions import (
 )
 from app.models.user_model import User
 
-security = HTTPBearer(auto_error=False)
-
 async def get_current_user(
     request: Request,
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    access_token: str | None = Cookie(default=None),
     db: AsyncSession = Depends(get_db),
 ) -> User:
     if not request.headers.get("user-agent"):
         raise MissingUserAgentException()
 
-    if not credentials:
+    if not access_token:
         raise MissingTokenException()
 
-    token = credentials.credentials
+    token = access_token
 
     is_blacklisted = await redis_client.get(f"blacklist:{token}")
     if is_blacklisted:

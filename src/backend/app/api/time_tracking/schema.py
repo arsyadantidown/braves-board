@@ -44,6 +44,8 @@ class TimeLogItem(BaseModel):
 
 
 class TimeLogsResponse(BaseModel):
-    task_id: uuid.UUID
+    user_id: uuid.UUID
+    board_id: Optional[uuid.UUID] = None
+    task_id: Optional[uuid.UUID] = None
     count: int
     logs: List[TimeLogItem]

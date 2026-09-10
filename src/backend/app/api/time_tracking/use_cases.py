@@ -225,21 +225,20 @@ class TimeTrackingUseCase:
 
     async def get_time_logs(
         self,
-        task_id: uuid.UUID,
-        user_id: uuid.UUID | None = None,
+        user_id: uuid.UUID,
+        board_id: uuid.UUID | None = None,
+        task_id: uuid.UUID | None = None,
     ):
-        task = await self.task_repo.get_by_id(task_id)
-
-        if not task:
-            raise TaskNotFoundException()
-
-        logs = await self.time_log_repo.get_all_by_task_id(
-            task_id,
-            user_id,
+        logs = await self.time_log_repo.get_all_by_user_id(
+            user_id=user_id,
+            board_id=board_id,
+            task_id=task_id,
         )
 
         return {
-            "task_id": str(task_id),
+            "user_id": str(user_id),
+            "board_id": str(board_id) if board_id else None,
+            "task_id": str(task_id) if task_id else None,
             "count": len(logs),
             "logs": [
                 {
@@ -255,7 +254,7 @@ class TimeTrackingUseCase:
                 for log in logs
             ]
         }
-
+    
     async def update_time_log(
         self,
         task_id: uuid.UUID,

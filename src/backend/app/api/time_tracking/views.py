@@ -1,6 +1,7 @@
 import uuid
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Optional
 
 from app.connections.postgres import get_db
 from app.models.user_model import User
@@ -14,6 +15,7 @@ from app.api.time_tracking.use_cases import TimeTrackingUseCase
 from app.api.standard_response import success_response
 
 from app.core.dependencies import require_permission
+from app.api.depedencies import get_current_user
 
 
 router = APIRouter(
@@ -178,22 +180,28 @@ async def delete_time_log(
     return success_response(result)
 
 @router.get(
-    "/{task_id}/timer/logs",
+    "/timer/logs",
     status_code=status.HTTP_200_OK
 )
 async def get_time_logs(
-    task_id: uuid.UUID,
+    user_id: uuid.UUID,
+    board_id: Optional[uuid.UUID] = None,
+    task_id: Optional[uuid.UUID] = None,
     use_case: TimeTrackingUseCase = Depends(
         get_time_tracking_use_case
     ),
-    current_user: User = Depends(
-        require_permission("task.view")
-    ),
+    current_user: User = Depends(get_current_user),
 ):
+    if user_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="You can only view your own time logs"
+        )
+
     result = await use_case.get_time_logs(
-        task_id,
-        current_user.id
+        user_id=user_id,
+        board_id=board_id,
+        task_id=task_id,
     )
 
     return success_response(result)
-

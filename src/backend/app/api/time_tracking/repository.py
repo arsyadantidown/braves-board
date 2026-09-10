@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.time_log_model import TimeLog
 from app.api.time_tracking.schema import TimeLogCreate
-
+from app.models.task_model import Task
 
 class TimeLogRepository:
     def __init__(self, session: AsyncSession):
@@ -44,6 +44,35 @@ class TimeLogRepository:
         if user_id is not None:
             stmt = stmt.where(
                 TimeLog.user_id == user_id
+            )
+
+        stmt = stmt.order_by(TimeLog.created_at)
+
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
+    async def get_all_by_user_id(
+        self,
+        user_id: uuid.UUID,
+        board_id: uuid.UUID | None = None,
+        task_id: uuid.UUID | None = None,
+    ) -> Sequence[TimeLog]:
+        stmt = (
+            select(TimeLog)
+            .join(Task, TimeLog.task_id == Task.id)
+            .where(
+                TimeLog.user_id == user_id
+            )
+        )
+
+        if board_id is not None:
+            stmt = stmt.where(
+                Task.board_id == board_id
+            )
+
+        if task_id is not None:
+            stmt = stmt.where(
+                TimeLog.task_id == task_id
             )
 
         stmt = stmt.order_by(TimeLog.created_at)
