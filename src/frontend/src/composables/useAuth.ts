@@ -1,47 +1,41 @@
-import { ref, computed } from 'vue'
-import type { User } from '../modules/auth/api/auth.api'
-import { getCurrentUser, logout as apiLogout } from '../modules/auth/api/auth.api'
-
-// State global (singleton pattern tanpa Pinia)
-const user = ref<User | null>(null)
-const loading = ref(false)
-const error = ref<string | null>(null)
-
-// Coba load user dari localStorage saat pertama kali
-const savedUser = localStorage.getItem('user')
-if (savedUser) {
-  try {
-    user.value = JSON.parse(savedUser)
-  } catch {
-    localStorage.removeItem('user')
-  }
-}
+import { storeToRefs } from "pinia";
+import {
+  getCurrentUser,
+  logout as apiLogout,
+} from "../modules/auth/api/auth.api";
+import { useAuthStore } from "../modules/auth/store/auth.store";
 
 export function useAuth() {
-  const isAuthenticated = computed(() => {
-    return !!localStorage.getItem('access_token') && user.value !== null
-  })
+  const authStore = useAuthStore();
+  const { user, loading, error, accessToken, isAuthenticated } =
+    storeToRefs(authStore);
 
   async function fetchCurrentUser() {
-    loading.value = true
-    error.value = null
+    loading.value = true;
+    error.value = null;
+
     try {
-      user.value = await getCurrentUser()
+      const currentUser = await getCurrentUser();
+      authStore.setUser(currentUser);
+      return currentUser;
     } catch (err: unknown) {
-      error.value = err instanceof Error ? err.message : 'Gagal memuat profil'
-      user.value = null
+      error.value = err instanceof Error ? err.message : "Gagal memuat profil";
+
+      authStore.setUser(null);
+      throw err;
     } finally {
-      loading.value = false
+      loading.value = false;
     }
   }
 
   async function signOut() {
-    loading.value = true
+    loading.value = true;
+
     try {
-      await apiLogout()
+      await apiLogout();
     } finally {
-      user.value = null
-      loading.value = false
+      authStore.clearSession();
+      loading.value = false;
     }
   }
 
@@ -49,8 +43,9 @@ export function useAuth() {
     user,
     loading,
     error,
+    accessToken,
     isAuthenticated,
     fetchCurrentUser,
     signOut,
-  }
+  };
 }
