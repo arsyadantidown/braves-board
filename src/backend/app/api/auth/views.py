@@ -129,7 +129,7 @@ async def get_current_user_profile(current_user: User = Depends(get_current_user
         created_at=current_user.created_at,
     ))
 
-@router.post("/refresh")
+@router.post("/refresh", response_model=StandardResponse[AccessTokenData])
 async def refresh_token(
     response: Response,
     refresh_token: str | None = Cookie(default=None),
@@ -151,9 +151,12 @@ async def refresh_token(
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
 
-    return success_response({
-        "message": "Token refreshed successfully"
-    })
+    return success_response(
+        AccessTokenData(
+            access_token=result["access_token"],
+            expires_in=result["expires_in"],
+        )
+    )
 
 @router.post("/logout", response_model=StandardResponse[LogoutData])
 async def logout(
