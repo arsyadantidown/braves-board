@@ -47,6 +47,7 @@ class TaskUseCase:
     async def create_task(
         self,
         request: TaskCreateRequest,
+        current_user: User,
     ):
         column = await self.column_repo.get_by_id(
             request.column_id
@@ -74,6 +75,17 @@ class TaskUseCase:
 
         task = await self.task_repo.create(
             task_data
+        )
+
+        await self.activity_use_case.create(
+            board_id=column.board_id,
+            user_id=current_user.id,
+            task_id=task.id,
+            action="task_created",
+            description=(
+                f'{current_user.full_name} created task '
+                f'"{task.title}"'
+            ),
         )
 
         for user_id in task.assignee_ids or []:
@@ -116,7 +128,6 @@ class TaskUseCase:
                 "title": task.title,
                 "position": task.position,
                 "due_date": task.due_date,
-                "labels": task.labels,
                 "assignee_ids": task.assignee_ids,
                 "comment_count": comment_count,
                 "attachment_count": attachment_count,
@@ -159,7 +170,6 @@ class TaskUseCase:
         old_description = task.description
         old_due_date = task.due_date
         old_assignee_ids = set(task.assignee_ids or [])
-        old_labels = task.labels or []
 
         if request.assignee_ids is not None:
             users_valid = await self.user_repo.check_users_exist(
@@ -354,6 +364,9 @@ class TaskUseCase:
             updated_task.column_id
         )
 
+        if not column:
+            raise ColumnNotFoundException()
+
         action = (
             "task_completed"
             if updated_task.is_completed
@@ -383,6 +396,7 @@ class TaskUseCase:
     async def archive_task(
         self,
         task_id: uuid.UUID,
+        current_user: User,
     ):
         task = await self.task_repo.get_by_id(
             task_id
@@ -398,6 +412,24 @@ class TaskUseCase:
         if not archived_task:
             raise TaskNotFoundException()
 
+        column = await self.column_repo.get_by_id(
+            archived_task.column_id
+        )
+
+        if not column:
+            raise ColumnNotFoundException()
+
+        await self.activity_use_case.create(
+            board_id=column.board_id,
+            user_id=current_user.id,
+            task_id=archived_task.id,
+            action="task_archived",
+            description=(
+                f'{current_user.full_name} archived task '
+                f'"{archived_task.title}"'
+            ),
+        )
+
         return {
             "id": archived_task.id,
             "is_archived": archived_task.is_archived,
@@ -407,6 +439,7 @@ class TaskUseCase:
     async def unarchive_task(
         self,
         task_id: uuid.UUID,
+        current_user: User,
     ):
         task = await self.task_repo.get_by_id(
             task_id
@@ -421,6 +454,24 @@ class TaskUseCase:
 
         if not unarchived_task:
             raise TaskNotFoundException()
+
+        column = await self.column_repo.get_by_id(
+            unarchived_task.column_id
+        )
+
+        if not column:
+            raise ColumnNotFoundException()
+
+        await self.activity_use_case.create(
+            board_id=column.board_id,
+            user_id=current_user.id,
+            task_id=unarchived_task.id,
+            action="task_unarchived",
+            description=(
+                f'{current_user.full_name} unarchived task '
+                f'"{unarchived_task.title}"'
+            ),
+        )
 
         return {
             "id": unarchived_task.id,
@@ -622,6 +673,7 @@ class TaskUseCase:
     async def delete_task(
         self,
         task_id: uuid.UUID,
+        current_user: User,
     ):
         task = await self.task_repo.get_by_id(
             task_id
@@ -634,6 +686,9 @@ class TaskUseCase:
             task.column_id
         )
 
+        if not column:
+            raise ColumnNotFoundException()
+
         deleted = await self.task_repo.soft_delete(
             task_id
         )
@@ -643,6 +698,17 @@ class TaskUseCase:
 
         await self.task_repo.cascade_soft_delete_subtasks(
             task_id
+        )
+
+        await self.activity_use_case.create(
+            board_id=column.board_id,
+            user_id=current_user.id,
+            task_id=task.id,
+            action="task_deleted",
+            description=(
+                f'{current_user.full_name} deleted task '
+                f'"{task.title}"'
+            ),
         )
 
         for user_id in task.assignee_ids or []:

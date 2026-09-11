@@ -11,6 +11,8 @@ from app.api.task.schema import (
     TaskReorderRequest,
 )
 
+from app.api.task_activity.use_cases import ActivityUseCase
+from app.api.task_activity.schema import ActivityResponse
 from app.api.task.use_cases import TaskUseCase
 from app.models.user_model import User
 from app.api.standard_response import success_response
@@ -25,6 +27,10 @@ def get_task_use_case(
 ) -> TaskUseCase:
     return TaskUseCase(db)
 
+def get_activity_use_case(
+    db: AsyncSession = Depends(get_db)
+) -> ActivityUseCase:
+    return ActivityUseCase(db)
 
 @router.get("", status_code=status.HTTP_200_OK)
 async def get_tasks(
@@ -52,9 +58,35 @@ async def create_task(
         require_permission("task.create")
     ),
 ):
-    result = await use_case.create_task(payload)
+    result = await use_case.create_task(
+        payload,
+        current_user,
+    )
     return success_response(result)
 
+@router.get(
+    "/{task_id}/activities",
+    status_code=status.HTTP_200_OK,
+)
+async def get_task_activities(
+    task_id: uuid.UUID,
+    use_case: ActivityUseCase = Depends(
+        get_activity_use_case
+    ),
+    current_user: User = Depends(
+        require_permission("task.view")
+    ),
+):
+    result = await use_case.get_by_task(task_id)
+
+    return success_response(
+        [
+            ActivityResponse.model_validate(activity).model_dump(
+                mode="json"
+            )
+            for activity in result
+        ]
+    )
 
 @router.get("/{task_id}", status_code=status.HTTP_200_OK)
 async def get_task_detail(
@@ -79,7 +111,8 @@ async def archive_task(
     ),
 ):
     result = await use_case.archive_task(
-        task_id
+        task_id,
+        current_user,
     )
     return success_response(result)
 
@@ -93,7 +126,8 @@ async def unarchive_task(
     ),
 ):
     result = await use_case.unarchive_task(
-        task_id
+        task_id,
+        current_user,
     )
     return success_response(result)
 
@@ -173,6 +207,7 @@ async def delete_task(
     ),
 ):
     await use_case.delete_task(
-        task_id
+        task_id,
+        current_user,
     )
     return success_response(None)
