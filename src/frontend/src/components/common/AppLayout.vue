@@ -28,14 +28,25 @@
           <div class="flex items-center gap-1">
             <button
               @click="showProfile = !showProfile"
-              class="w-8 h-8 flex items-center justify-center rounded-full border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+              class="w-8 h-8 flex items-center justify-center rounded-full overflow-hidden border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
             >
+              <!-- Tampilkan foto HANYA jika ada URL dan TIDAK error -->
               <img
-                v-if="user?.picture_url"
+                v-if="user?.picture_url && !imgError"
                 :src="user.picture_url"
                 :alt="user.full_name"
+                @error="imgError = true"
                 class="h-8 w-8 rounded-full object-cover"
               />
+              <!-- Fallback: Jika tidak ada foto ATAU gambar broken, tampilkan Inisial -->
+              <div
+                v-else
+                class="w-full h-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center"
+              >
+                {{
+                  user?.full_name ? user.full_name.charAt(0).toUpperCase() : "U"
+                }}
+              </div>
             </button>
 
             <font-awesome-icon
@@ -59,12 +70,23 @@
             <div
               class="flex items-center gap-3 border-b border-gray-200 p-4 dark:border-gray-700"
             >
+              <!-- Tampilkan foto HANYA jika ada URL dan TIDAK error -->
               <img
-                v-if="user?.picture_url"
+                v-if="user?.picture_url && !imgError"
                 :src="user.picture_url"
                 :alt="user.full_name"
+                @error="imgError = true"
                 class="h-12 w-12 rounded-full object-cover ring-2 ring-gray-100 dark:ring-gray-700"
               />
+              <!-- Fallback: Jika tidak ada foto ATAU gambar broken, tampilkan Inisial -->
+              <div
+                v-else
+                class="h-12 w-12 rounded-full bg-blue-600 text-white font-bold text-lg flex items-center justify-center ring-2 ring-gray-100 dark:ring-gray-700 flex-shrink-0"
+              >
+                {{
+                  user?.full_name ? user.full_name.charAt(0).toUpperCase() : "U"
+                }}
+              </div>
 
               <div class="min-w-0">
                 <p
@@ -114,8 +136,8 @@ const { isDark, toggleTheme } = useTheme();
 library.add(faQuestion, faUser, faMoon, faSun, faChevronDown, faChevronUp);
 
 const { user, fetchCurrentUser } = useAuth();
-
 const showProfile = ref(false);
+const imgError = ref(false);
 
 onMounted(() => {
   if (!user.value) {
