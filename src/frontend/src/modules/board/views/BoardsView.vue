@@ -1718,6 +1718,7 @@ const {
   users,
   boards: boardList,
   boardMembers,
+  availableMembers,
   archivedByBoard,
 } = storeToRefs(store);
 const boards = computed(() => columnsByBoard.value[boardId] ?? []);
@@ -1927,9 +1928,9 @@ const canRemoveMember = computed(() =>
 const canChangeMemberRole = computed(() =>
   hasPermission(myBoardRole.value, "member.change_role"),
 );
-const addableUsers = computed(() =>
-  users.value.filter((u: any) => !boardMemberUserIds.value.includes(u.id)),
-);
+
+// Ambil calon member dari endpoint /available backend (tersimpan di store)
+const addableUsers = computed(() => availableMembers.value[boardId] ?? []);
 
 // Update: backend sekarang MENOLAK soft_delete() owner terakhir
 // (board_member/repository.py — cek count_owners <= 1), tapi errornya pakai
@@ -1971,7 +1972,11 @@ async function openMembersPanel() {
   showMembersPanel.value = true;
   membersLoading.value = true;
   try {
-    await Promise.all([store.fetchBoardMembers(boardId), store.fetchUsers()]);
+    await Promise.all([
+      store.fetchBoardMembers(boardId, true),
+      store.fetchAvailableMembers(boardId),
+      store.fetchUsers(),
+    ]);
   } catch (e: any) {
     showToast(apiErrorMessage(e, "Gagal memuat board members."));
   } finally {
@@ -1983,16 +1988,34 @@ async function handleAddMember() {
   if (!newMemberUserId.value || memberActionLoading.value) return;
   memberActionLoading.value = true;
   try {
+    // Ambil nama user untuk pesan toast yang ramah
+    const targetUser = addableUsers.value.find(
+      (u: any) => u.id === newMemberUserId.value,
+    );
+    const userName =
+      targetUser?.full_name || targetUser?.email || "Member baru";
+
     await store.addBoardMemberToStore(
       boardId,
       newMemberUserId.value,
       newMemberRole.value,
     );
-    showToast("Member added.");
+
+    // NOTIFIKASI TOAST SUCCESS
+    showToast(
+      `🎉 ${userName} berhasil ditambahkan sebagai ${newMemberRole.value}!`,
+    );
+
     newMemberUserId.value = "";
     newMemberRole.value = "member";
+
+    // Refresh daftar member aktif DAN daftar calon member (available) dari backend
+    await Promise.all([
+      store.fetchBoardMembers(boardId, true),
+      store.fetchAvailableMembers(boardId),
+    ]);
   } catch (e: any) {
-    showToast(apiErrorMessage(e, "Gagal menambah member."));
+    showToast(apiErrorMessage(e, "Gagal menambah member ke board."));
   } finally {
     memberActionLoading.value = false;
   }
@@ -2001,57 +2024,57 @@ async function handleAddMember() {
 async function handleUpdateMemberRole(userId: string, role: BoardRole) {
   if (role !== "owner" && isSoleOwner(userId)) {
     showToast(
-      "Tidak bisa mengubah role satu-satunya owner board ini. Jadikan user lain owner dulu.",
+      "⚠️ Tidak bisa mengubah role satu-satunya owner board ini. Jadikan user lain owner dulu.",
     );
     return;
   }
   try {
+    const userLabel = resolveUserLabel(userId).name;
     await store.updateBoardMemberRoleInStore(boardId, userId, role);
-    showToast("Role diperbarui.");
+
+    // NOTIFIKASI TOAST UPDATE ROLE
+    showToast(`✏️ Role ${userLabel} diperbarui menjadi ${role.toUpperCase()}.`);
   } catch (e: any) {
-    showToast(apiErrorMessage(e, "Gagal mengubah role."));
+    showToast(apiErrorMessage(e, "Gagal mengubah role member."));
   }
 }
 
 async function removeBoardMember(userId: string) {
   const isSelf = userId === currentUser.value?.id;
+  const userLabel = resolveUserLabel(userId).name;
 
   if (isSoleOwner(userId)) {
     showToast(
       isSelf
-        ? "Anda satu-satunya owner board ini — tidak bisa keluar. Jadikan user lain owner dulu."
-        : "Tidak bisa menghapus satu-satunya owner board ini. Jadikan user lain owner dulu.",
+        ? "⚠️ Anda satu-satunya owner board ini — tidak bisa keluar. Jadikan user lain owner dulu."
+        : "⚠️ Tidak bisa menghapus satu-satunya owner board ini. Jadikan user lain owner dulu.",
     );
     return;
   }
 
   const confirmMsg = isSelf
-    ? "Anda akan keluar dari board ini dan kehilangan akses ke board ini. Lanjutkan?"
-    : "Hapus member ini dari board?";
+    ? "Anda akan keluar dari board ini dan kehilangan akses. Lanjutkan?"
+    : `Hapus ${userLabel} dari board ini?`;
   if (!window.confirm(confirmMsg)) return;
 
   try {
     await store.removeBoardMemberFromStore(boardId, userId);
-    showToast(isSelf ? "Anda telah keluar dari board." : "Member dihapus.");
-    if (isSelf) router.replace("/boards");
-  } catch (e: any) {
-    // Backend menolak hapus owner terakhir dengan 404 "Board tidak
-    // ditemukan" (BoardNotFoundException dipakai ulang) — bukan 403/400.
-    // Guard di atas seharusnya sudah mencegah ini duluan; kalau tetap
-    // ke-trigger (race condition, data member basi), tampilkan pesan yang
-    // masuk akal, bukan "Board tidak ditemukan" mentah yang membingungkan.
-    if (e?.response?.status === 404) {
-      showToast(
-        "Gagal menghapus member — kemungkinan ini satu-satunya owner board ini. Coba refresh dan cek lagi.",
-      );
-      return;
-    }
+
+    // NOTIFIKASI TOAST HAPUS / KELUAR
     showToast(
-      apiErrorMessage(
-        e,
-        isSelf ? "Gagal keluar dari board." : "Gagal menghapus member.",
-      ),
+      isSelf
+        ? "👋 Anda telah keluar dari board."
+        : `🗑️ ${userLabel} telah dihapus dari board.`,
     );
+
+    if (isSelf) {
+      router.replace("/boards");
+    } else {
+      // Refresh daftar calon member agar user yang dihapus bisa di-invite kembali jika perlu
+      await store.fetchAvailableMembers(boardId);
+    }
+  } catch (e: any) {
+    showToast(apiErrorMessage(e, "Gagal menghapus member."));
   }
 }
 
