@@ -1685,6 +1685,8 @@ interface Task {
   dueDate?: string;
   label?: string;
   labelClass?: string;
+  total_duration?: number;
+  is_timer_running?: boolean;
 }
 
 library.add(
@@ -2325,7 +2327,19 @@ async function doStopTimer(taskId: string) {
     localStorage.removeItem("active_timer_started_at");
     showToast(`Timer stopped ⏹ — ${formatTimer(elapsed)}`);
 
-    // Log baru baru tercatat di backend setelah stop — tarik ulang biar langsung tampil.
+    // ✅ LANGSUNG UBAH TAMPILAN KE TOTAL AKUMULASI WAKTU
+    const task = findTaskById(taskId);
+    if (task) {
+      // 1. Akumulasikan total detik pengerjaan
+      task.total_duration = (task.total_duration ?? 0) + elapsed;
+      // 2. Langsung set tampilan kartu ke waktu total akumulasi (misal 10s lama + 4s baru = 14s)
+      task.time = formatTimer(task.total_duration);
+    }
+
+    // Reset detik sesi
+    timerSeconds.value[taskId] = 0;
+
+    // Refresh log di modal jika task sedang dibuka
     if (selectedTask.value?.id === taskId) {
       await loadTimerLogs(taskId);
     }
