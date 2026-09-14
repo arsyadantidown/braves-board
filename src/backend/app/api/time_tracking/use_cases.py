@@ -242,16 +242,26 @@ class TimeTrackingUseCase:
             "count": len(logs),
             "logs": [
                 {
-                    "id": str(log.id),
+                    "id": log.id,
                     "user_id": log.user_id,
+
+                    "task_id": task.id,
+                    "task_title": task.title,
+
+                    "column_id": column.id,
+                    "column_title": column.title,
+
+                    "board_id": board.id,
+                    "board_title": board.title,
+
                     "start_time": log.start_time,
                     "stop_time": log.stop_time,
                     "duration_seconds": log.duration_seconds,
                     "activity_description": log.activity_description,
                     "stop_reason": log.stop_reason,
-                    "created_at": log.created_at
+                    "created_at": log.created_at,
                 }
-                for log in logs
+                for log, task, column, board in logs
             ]
         }
     

@@ -8,6 +8,7 @@ from app.models.task_model import Task
 from app.models.time_log_model import TimeLog
 from app.api.time_tracking.schema import TimeLogCreate
 from app.models.column_model import Column
+from app.models.board_model import Board
 
 class TimeLogRepository:
     def __init__(self, session: AsyncSession):
@@ -57,11 +58,12 @@ class TimeLogRepository:
         user_id: uuid.UUID,
         board_id: uuid.UUID | None = None,
         task_id: uuid.UUID | None = None,
-    ) -> Sequence[TimeLog]:
+    ):
         stmt = (
-            select(TimeLog)
+            select(TimeLog, Task, Column, Board)
             .join(Task, TimeLog.task_id == Task.id)
             .join(Column, Task.column_id == Column.id)
+            .join(Board, Column.board_id == Board.id)
             .where(
                 TimeLog.user_id == user_id
             )
@@ -80,7 +82,7 @@ class TimeLogRepository:
         stmt = stmt.order_by(TimeLog.created_at)
 
         result = await self.session.execute(stmt)
-        return result.scalars().all()
+        return result.all()
 
     async def create(
         self,

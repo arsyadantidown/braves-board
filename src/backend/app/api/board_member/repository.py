@@ -6,7 +6,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.board_member_model import BoardMember, BoardRole
-
+from app.models.user_model import User
 
 class BoardMemberRepository:
     def __init__(self, session: AsyncSession):
@@ -79,6 +79,24 @@ class BoardMemberRepository:
         result = await self.session.execute(stmt)
 
         return result.scalars().all()
+
+    async def get_all_with_users(
+        self,
+        board_id: uuid.UUID,
+    ):
+        stmt = (
+            select(BoardMember, User)
+            .join(User, BoardMember.user_id == User.id)
+            .where(
+                BoardMember.board_id == board_id,
+                BoardMember.deleted_at.is_(None),
+                User.deleted_at.is_(None),
+            )
+            .order_by(BoardMember.created_at.asc())
+        )
+
+        result = await self.session.execute(stmt)
+        return result.all()
 
     async def count_owners(
         self,

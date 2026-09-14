@@ -13,7 +13,6 @@ from app.api.exceptions.board_exceptions import BoardNotFoundException, InvalidB
 from app.api.board_member.repository import BoardMemberRepository
 from app.models.board_member_model import BoardRole
 
-
 class BoardUseCase:
     def __init__(self, repo: BoardRepository, session):
         self.repo = repo
@@ -164,6 +163,19 @@ class BoardUseCase:
         if not board:
             raise BoardNotFoundException()
 
+        members = await self.board_member_repo.get_all_with_users(board_id)
+
+        member_list = [
+            {
+                "user_id": str(member.user_id),
+                "full_name": user.full_name,
+                "email": user.email,
+                "picture_url": user.picture_url,
+                "role": member.role,
+            }
+            for member, user in members
+        ]
+
         columns = await self.column_repo.get_all_by_board_id(board_id)
         columns = columns or []
 
@@ -196,6 +208,7 @@ class BoardUseCase:
                 "user_id": str(board.user_id),
                 "created_at": board.created_at,
                 "updated_at": board.updated_at,
+                "member_list": member_list,
                 "columns": [
                     {
                         "id": str(c.id),

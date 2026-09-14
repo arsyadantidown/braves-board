@@ -3,6 +3,7 @@ from typing import Sequence, List
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.user_model import User
+from app.models.board_member_model import BoardMember
 
 class UserRepository:
     def __init__(self, session: AsyncSession):
@@ -19,3 +20,25 @@ class UserRepository:
         result = await self.session.execute(stmt)
         count = result.scalar()
         return count == len(unique_ids)
+
+    async def get_available_members(
+        self,
+        board_id: uuid.UUID,
+    ) -> Sequence[User]:
+        stmt = (
+            select(User)
+            .outerjoin(
+                BoardMember,
+                (BoardMember.user_id == User.id)
+                & (BoardMember.board_id == board_id)
+                & (BoardMember.deleted_at.is_(None))
+            )
+            .where(
+                User.deleted_at.is_(None),
+                BoardMember.id.is_(None),
+            )
+            .order_by(User.full_name)
+        )
+
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
