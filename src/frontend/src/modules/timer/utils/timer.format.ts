@@ -2,22 +2,29 @@
 // Formatting untuk tampilan timer & time log.
 
 export interface TimerLog {
-  id: string
-  start_time: string | null
-  stop_time: string | null
-  duration_seconds: number | null
-  activity_description: string | null
-  stop_reason: string | null
-  created_at: string | null
+  id: string;
+  task_id: string;
+  task_title?: string | null;
+  column_id?: string | null;
+  column_title?: string | null;
+  board_id?: string | null;
+  board_title?: string | null;
+  user_id: string;
+  start_time: string | null;
+  stop_time: string | null;
+  duration_seconds: number | null;
+  activity_description: string | null;
+  stop_reason: string | null;
+  created_at: string | null;
 }
 
 /** Detik → "HH:MM:SS" (untuk stopwatch berjalan). */
 export function formatTimer(seconds: number): string {
-  const safe = Math.max(0, Math.floor(seconds || 0))
-  const h = String(Math.floor(safe / 3600)).padStart(2, '0')
-  const m = String(Math.floor((safe % 3600) / 60)).padStart(2, '0')
-  const s = String(safe % 60).padStart(2, '0')
-  return `${h}:${m}:${s}`
+  const safe = Math.max(0, Math.floor(seconds || 0));
+  const h = String(Math.floor(safe / 3600)).padStart(2, "0");
+  const m = String(Math.floor((safe % 3600) / 60)).padStart(2, "0");
+  const s = String(safe % 60).padStart(2, "0");
+  return `${h}:${m}:${s}`;
 }
 
 /**
@@ -26,24 +33,24 @@ export function formatTimer(seconds: number): string {
  * titik sebagai pemisah ("13.00"), sedangkan format yang diminta pakai titik dua.
  */
 export function formatClock(iso: string | null): string {
-  if (!iso) return '-'
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return '-'
-  const h = String(date.getHours()).padStart(2, '0')
-  const m = String(date.getMinutes()).padStart(2, '0')
-  return `${h}:${m}`
+  if (!iso) return "-";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "-";
+  const h = String(date.getHours()).padStart(2, "0");
+  const m = String(date.getMinutes()).padStart(2, "0");
+  return `${h}:${m}`;
 }
 
 /** ISO string → "14 Jul 2026". */
 export function formatLogDate(iso: string | null): string {
-  if (!iso) return '-'
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return '-'
-  return date.toLocaleDateString('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })
+  if (!iso) return "-";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleDateString("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 /**
@@ -51,15 +58,15 @@ export function formatLogDate(iso: string | null): string {
  * Menit disembunyikan kalau pas di jam bulat, sesuai contoh "13:00 → 16:00, 3 jam".
  */
 export function formatDuration(seconds: number | null): string {
-  const total = Math.max(0, Math.floor(seconds ?? 0))
-  if (total < 60) return `${total} detik`
+  const total = Math.max(0, Math.floor(seconds ?? 0));
+  if (total < 60) return `${total} detik`;
 
-  const hours = Math.floor(total / 3600)
-  const minutes = Math.floor((total % 3600) / 60)
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
 
-  if (hours === 0) return `${minutes} menit`
-  if (minutes === 0) return `${hours} jam`
-  return `${hours} jam ${minutes} menit`
+  if (hours === 0) return `${minutes} menit`;
+  if (minutes === 0) return `${hours} jam`;
+  return `${hours} jam ${minutes} menit`;
 }
 
 /**
@@ -67,18 +74,21 @@ export function formatDuration(seconds: number | null): string {
  * Log yang timernya masih jalan (belum ada stop_time) → "13:00 → berjalan".
  */
 export function formatTimerLog(log: TimerLog): string {
-  const start = formatClock(log.start_time)
+  const start = formatClock(log.start_time);
 
   if (!log.stop_time) {
-    return `${start} → berjalan`
+    return `${start} → berjalan`;
   }
 
-  return `${start} → ${formatClock(log.stop_time)}, ${formatDuration(log.duration_seconds)}`
+  return `${start} → ${formatClock(log.stop_time)}, ${formatDuration(log.duration_seconds)}`;
 }
 
 /** Total durasi semua log dalam detik. */
 export function totalDurationSeconds(logs: TimerLog[]): number {
-  return logs.reduce((sum, log) => sum + Math.max(0, log.duration_seconds ?? 0), 0)
+  return logs.reduce(
+    (sum, log) => sum + Math.max(0, log.duration_seconds ?? 0),
+    0,
+  );
 }
 
 /**
@@ -88,15 +98,15 @@ export function totalDurationSeconds(logs: TimerLog[]): number {
 export function formatStopReason(reason: string | null): string | null {
   switch (reason) {
     case null:
-    case 'manual':
-      return null
-    case 'normal_close':
-      return 'Tab ditutup'
-    case 'no_response':
-      return 'Tidak ada respons'
-    case 'unexpected_close':
-      return 'Auto-stop (idle)'
+    case "manual":
+      return null;
+    case "normal_close":
+      return "Tab ditutup";
+    case "no_response":
+      return "Tidak ada respons";
+    case "unexpected_close":
+      return "Auto-stop (idle)";
     default:
-      return reason
+      return reason;
   }
 }
