@@ -7,34 +7,59 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.board_model import Board
 from app.api.board.schema import BoardCreate
-
+from app.models.board_member_model import BoardMember
 
 class BoardRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def get_by_id(self, board_id: uuid.UUID, user_id: uuid.UUID) -> Board | None:
-        stmt = select(Board).options(
-            selectinload(Board.columns)
-        ).where(
-            Board.id == board_id,
-            Board.user_id == user_id,
-            Board.deleted_at.is_(None)
+    async def get_by_id(
+        self,
+        board_id: uuid.UUID,
+        user_id: uuid.UUID,
+    ) -> Board | None:
+        stmt = (
+            select(Board)
+            .options(
+                selectinload(Board.columns)
+            )
+            .join(
+                BoardMember,
+                BoardMember.board_id == Board.id,
+            )
+            .where(
+                Board.id == board_id,
+                BoardMember.user_id == user_id,
+                BoardMember.deleted_at.is_(None),
+                Board.deleted_at.is_(None),
+            )
         )
+
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_all(self, user_id: uuid.UUID, limit: int, offset: int) -> Sequence[Board]:
+    async def get_all(
+        self,
+        user_id: uuid.UUID,
+        limit: int,
+        offset: int,
+    ) -> Sequence[Board]:
         stmt = (
             select(Board)
+            .join(
+                BoardMember,
+                BoardMember.board_id == Board.id,
+            )
             .where(
-                Board.user_id == user_id,
-                Board.deleted_at.is_(None)
+                BoardMember.user_id == user_id,
+                BoardMember.deleted_at.is_(None),
+                Board.deleted_at.is_(None),
             )
             .order_by(Board.created_at.desc())
             .limit(limit)
             .offset(offset)
         )
+
         result = await self.session.execute(stmt)
         return result.scalars().all()
 

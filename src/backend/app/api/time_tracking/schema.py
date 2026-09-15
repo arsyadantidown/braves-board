@@ -33,6 +33,16 @@ class TimeLogUpdate(BaseModel):
 class TimeLogItem(BaseModel):
     id: uuid.UUID
     user_id: uuid.UUID
+
+    task_id: uuid.UUID
+    task_title: str
+
+    column_id: uuid.UUID
+    column_title: str
+
+    board_id: uuid.UUID
+    board_title: str
+
     start_time: datetime
     stop_time: Optional[datetime] = None
     duration_seconds: Optional[int] = None

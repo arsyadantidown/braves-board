@@ -6,11 +6,18 @@ from app.api.board_member.schema import (
     BoardMemberUpdate,
     BoardMemberResponse,
 )
+from app.api.user.repository import UserRepository
 from app.api.exceptions.board_exceptions import BoardNotFoundException
 
+
 class BoardMemberUseCase:
-    def __init__(self, repo: BoardMemberRepository):
+    def __init__(
+        self,
+        repo: BoardMemberRepository,
+        user_repo: UserRepository,
+    ):
         self.repo = repo
+        self.user_repo = user_repo
 
     async def get_all(self, board_id: uuid.UUID):
         members = await self.repo.get_all(board_id)
@@ -18,6 +25,19 @@ class BoardMemberUseCase:
         return [
             BoardMemberResponse.model_validate(member).model_dump(mode="json")
             for member in members
+        ]
+
+    async def get_available_members(self, board_id: uuid.UUID):
+        users = await self.user_repo.get_available_members(board_id)
+
+        return [
+            {
+                "id": user.id,
+                "email": user.email,
+                "full_name": user.full_name,
+                "picture_url": user.picture_url,
+            }
+            for user in users
         ]
 
     async def create(

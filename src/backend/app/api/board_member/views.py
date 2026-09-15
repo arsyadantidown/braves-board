@@ -10,6 +10,7 @@ from app.models.user_model import User
 
 from app.api.board_member.repository import BoardMemberRepository
 from app.api.board_member.use_cases import BoardMemberUseCase
+from app.api.user.repository import UserRepository
 from app.api.board_member.schema import (
     BoardMemberCreate,
     BoardMemberUpdate,
@@ -28,7 +29,12 @@ def get_board_member_use_case(
     db: AsyncSession = Depends(get_db),
 ) -> BoardMemberUseCase:
     repo = BoardMemberRepository(db)
-    return BoardMemberUseCase(repo)
+    user_repo = UserRepository(db)
+
+    return BoardMemberUseCase(
+        repo,
+        user_repo,
+    )
 
 
 @router.get("", status_code=status.HTTP_200_OK)
@@ -42,6 +48,16 @@ async def get_board_members(
     result = await use_case.get_all(board_id)
     return success_response(result)
 
+@router.get("/available", status_code=status.HTTP_200_OK)
+async def get_available_members(
+    board_id: uuid.UUID,
+    use_case: BoardMemberUseCase = Depends(get_board_member_use_case),
+    current_user: User = Depends(
+        require_permission("member.invite")
+    ),
+):
+    result = await use_case.get_available_members(board_id)
+    return success_response(result)
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def add_board_member(
