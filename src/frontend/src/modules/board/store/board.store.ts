@@ -352,15 +352,20 @@ export const useAppStore = defineStore(
       return normalized;
     }
 
-    async function editTask(taskId: string, payload: object) {
+    async function editTask(taskId: string, payload: any) {
       const boardId = findBoardIdForTask(taskId);
       if (!boardId) throw new Error("Board tidak ditemukan untuk task ini.");
       await apiUpdateTask(taskId, payload, boardId);
       const found = findTaskInStore(taskId);
       if (found) {
+        const updateData: any = { ...payload };
+        // Pastikan dueDate (camelCase) ter-update di store agar kartu di boardview langsung berubah
+        if ("due_date" in payload || "dueDate" in payload) {
+          updateData.dueDate = payload.due_date ?? payload.dueDate ?? "-";
+        }
         found.col.tasks[found.idx] = {
           ...found.col.tasks[found.idx],
-          ...payload,
+          ...updateData,
         };
       }
     }

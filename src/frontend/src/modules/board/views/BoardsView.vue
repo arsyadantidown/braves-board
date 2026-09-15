@@ -1841,10 +1841,14 @@ async function handleDueDateChange(e: Event) {
   if (!selectedTask.value) return;
   const value = (e.target as HTMLInputElement).value;
   const iso = value ? new Date(`${value}T00:00:00`).toISOString() : null;
+  const taskToUpdate = selectedTask.value;
   try {
-    await store.editTask(selectedTask.value.id, { due_date: iso });
-    selectedTask.value.dueDate = iso ?? "-";
-    await refreshActivityAfterAction();
+    await store.editTask(taskToUpdate.id, { due_date: iso });
+    taskToUpdate.dueDate = iso ?? "-";
+    const storeTask = findTaskById(taskToUpdate.id);
+    if (storeTask) storeTask.dueDate = iso ?? "-";
+
+    refreshActivityAfterAction();
     showToast("Due date diperbarui.");
   } catch (err: any) {
     showToast(apiErrorMessage(err, "Gagal mengubah due date."));
@@ -2350,6 +2354,12 @@ async function doStopTimer(taskId: string) {
 
 async function loadTimerLogs(taskId: string) {
   if (!taskId) return;
+  const task = findTaskById(taskId);
+  // Hemat kuota rate limit: Skip request API jika task belum pernah punya timer
+  if (task && !task.total_duration && !task.is_timer_running) {
+    timerLogs.value = [];
+    return;
+  }
   timerLogsLoading.value = true;
   timerLogsError.value = "";
   try {
@@ -2742,24 +2752,36 @@ function openModal(task: Task) {
     title: task.title,
     description: task.description ?? "",
   };
-
   timerLogs.value = [];
   timerLogsError.value = "";
   timerDescription.value = "";
+  // 🚀 HIT SEMUA API GET SAAT OPEN MODAL
   loadTimerLogs(task.id);
-  loadPersistedComments(task);
+  loadTaskDetails(task);
   loadPersistedActivities(task);
 }
 
 // Card list dari backend tidak menyertakan komentar — hanya GET /tasks/{id}
 // (TaskDetailResponse) yang punya. Tarik saat modal dibuka supaya tab Comments
 // menampilkan komentar tersimpan, bukan cuma yang diketik di sesi ini.
-async function loadPersistedComments(task: Task) {
+async function loadTaskDetails(task: Task) {
   commentsLoading.value = true;
   try {
+    // 1 Hit API GET /tasks/{id} untuk mengambil SELURUH detail card sekaligus
     const detail = await apiGetTaskDetail(task.id, boardId);
-    // Modal keburu ditutup / ganti card sebelum request selesai.
     if (selectedTask.value?.id !== task.id) return;
+    if (detail?.description !== undefined)
+      task.description = detail.description ?? "";
+    if (detail?.due_date !== undefined) task.dueDate = detail.due_date ?? "-";
+    // Subtask dari server (termasuk yang completed)
+    if (detail?.subtasks) {
+      task.subtasks = detail.subtasks.map((s: any) => ({
+        id: s.id,
+        title: s.title,
+        completed: s.is_completed ?? s.completed ?? false,
+      }));
+    }
+    // Komentar dari server
     const comments = (detail?.comments ?? [])
       .map(
         (c: any): ActivityItem => ({
@@ -2779,21 +2801,13 @@ async function loadPersistedComments(task: Task) {
           createdAt: new Date(c.created_at).getTime() || 0,
         }),
       )
-      // Urutkan sumber berdasarkan waktu (terbaru dulu). Sebelumnya sort pakai
-      // `id.localeCompare` yang acak karena id bukan urut-waktu.
       .sort(
         (a: ActivityItem, b: ActivityItem) =>
           (b.createdAt ?? 0) - (a.createdAt ?? 0),
       );
-    // Pertahankan log aktivitas sesi (item tanpa .comment); ganti bagian komentar
-    // dengan data backend agar tidak dobel dengan komentar yang tadi diketik.
     const sessionLogs = task.activity.filter((a) => !a.comment);
     task.activity = [...comments, ...sessionLogs];
-
-    // Attachment juga hanya ada di GET /tasks/{id} (list /tasks tidak mengirim
-    // arraynya), jadi WAJIB dipetakan di sini — kalau tidak, attachment hilang
-    // setelah refresh. Backend pakai file_name & file_url; FE pakai title & url.
-    // Simpan id & type asli supaya bisa dihapus (dan bedakan link vs file).
+    // Attachment dari server
     task.attachments = (detail?.attachments ?? []).map((a: any) => ({
       id: a.id,
       title: a.file_name,
@@ -2801,11 +2815,12 @@ async function loadPersistedComments(task: Task) {
       url: a.file_url,
     }));
   } catch {
-    // Diamkan — biarkan feed sesi apa adanya kalau gagal memuat.
+    // Biarkan data lokal jika error
   } finally {
     if (selectedTask.value?.id === task.id) commentsLoading.value = false;
   }
 }
+
 async function loadPersistedActivities(task: Task) {
   activityLoading.value = true;
 
@@ -2852,10 +2867,18 @@ async function loadPersistedActivities(task: Task) {
   }
 }
 
-async function refreshActivityAfterAction() {
+let activityDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+function refreshActivityAfterAction() {
   if (!selectedTask.value) return;
 
-  await loadPersistedActivities(selectedTask.value);
+  if (activityDebounceTimer) clearTimeout(activityDebounceTimer);
+
+  activityDebounceTimer = setTimeout(() => {
+    if (selectedTask.value) {
+      loadPersistedActivities(selectedTask.value);
+    }
+  }, 500);
 }
 
 function closeModal() {
@@ -2896,7 +2919,7 @@ async function handleAddComment() {
     });
     newComment.value = "";
     // Reconcile dengan backend supaya komentar baru dapat id asli (untuk delete).
-    loadPersistedComments(selectedTask.value);
+    loadTaskDetails(selectedTask.value);
   } catch (e: any) {
     showToast(apiErrorMessage(e, "Gagal mengirim komentar."));
   } finally {
