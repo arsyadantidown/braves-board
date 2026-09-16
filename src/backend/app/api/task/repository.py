@@ -262,6 +262,46 @@ class TaskRepository:
         await self.session.execute(stmt)
         await self.session.commit()
 
+    async def cascade_soft_delete_by_board(
+        self,
+        board_id: uuid.UUID
+    ) -> None:
+        now = datetime.now(timezone.utc)
+
+        task_ids_stmt = (
+            select(Task.id)
+            .join(Column, Task.column_id == Column.id)
+            .where(
+                Column.board_id == board_id,
+                Task.deleted_at.is_(None),
+            )
+        )
+        result = await self.session.execute(task_ids_stmt)
+        task_ids = [row[0] for row in result.all()]
+
+        if not task_ids:
+            return
+
+        await self.session.execute(
+            update(Subtask)
+            .where(
+                Subtask.task_id.in_(task_ids),
+                Subtask.deleted_at.is_(None),
+            )
+            .values(deleted_at=now)
+        )
+
+        await self.session.execute(
+            update(Task)
+            .where(
+                Task.id.in_(task_ids),
+                Task.deleted_at.is_(None),
+            )
+            .values(deleted_at=now)
+        )
+
+        await self.session.commit()
+
     async def get_detail_by_id(
         self,
         task_id: uuid.UUID

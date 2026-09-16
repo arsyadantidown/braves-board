@@ -254,4 +254,8 @@ class BoardUseCase:
         success = await self.repo.soft_delete(board_id, user_id)
         if not success:
             raise BoardNotFoundException()
+
+        await self.task_repo.cascade_soft_delete_by_board(board_id)
+        await self.column_repo.cascade_soft_delete_by_board(board_id)
+
         return None

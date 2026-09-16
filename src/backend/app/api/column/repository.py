@@ -157,6 +157,21 @@ class ColumnRepository:
 
         return True
 
+    async def cascade_soft_delete_by_board(
+        self,
+        board_id: uuid.UUID
+    ) -> None:
+        stmt = (
+            update(Column)
+            .where(
+                Column.board_id == board_id,
+                Column.deleted_at.is_(None),
+            )
+            .values(deleted_at=datetime.now(timezone.utc))
+        )
+        await self.session.execute(stmt)
+        await self.session.commit()
+
     async def reorder(self, column_id: uuid.UUID, new_position: int) -> Column | None:
         column = await self.get_by_id(column_id)
         if not column:
