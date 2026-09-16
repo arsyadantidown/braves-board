@@ -21,6 +21,14 @@ class UserRepository:
         count = result.scalar()
         return count == len(unique_ids)
 
+    async def get_names_by_ids(self, user_ids: List[uuid.UUID]) -> dict[uuid.UUID, str]:
+        if not user_ids:
+            return {}
+        unique_ids = list(set(user_ids))
+        stmt = select(User.id, User.full_name).where(User.id.in_(unique_ids))
+        result = await self.session.execute(stmt)
+        return {row.id: row.full_name for row in result.all()}
+
     async def get_available_members(
         self,
         board_id: uuid.UUID,

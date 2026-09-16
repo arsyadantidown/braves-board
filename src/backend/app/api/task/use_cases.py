@@ -289,15 +289,20 @@ class TaskUseCase:
 
             added_assignees = new_assignee_ids - old_assignee_ids
             removed_assignees = old_assignee_ids - new_assignee_ids
+            
+            names = await self.user_repo.get_names_by_ids(
+                list(added_assignees | removed_assignees)
+            )
 
             for user_id in added_assignees:
+                member_name = names.get(user_id, "a member")
                 await self.activity_use_case.create(
                     board_id=column.board_id,
                     user_id=current_user.id,
                     task_id=updated_task.id,
                     action="task_assigned",
                     description=(
-                        f'{current_user.full_name} assigned a member '
+                        f'{current_user.full_name} assigned {member_name} '
                         f'to task "{updated_task.title}"'
                     ),
                     details={
@@ -306,13 +311,14 @@ class TaskUseCase:
                 )
 
             for user_id in removed_assignees:
+                member_name = names.get(user_id, "a member")
                 await self.activity_use_case.create(
                     board_id=column.board_id,
                     user_id=current_user.id,
                     task_id=updated_task.id,
                     action="task_unassigned",
                     description=(
-                        f'{current_user.full_name} unassigned a member '
+                        f'{current_user.full_name} unassigned {member_name} '
                         f'from task "{updated_task.title}"'
                     ),
                     details={
