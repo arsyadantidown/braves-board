@@ -289,11 +289,15 @@
                     task.subtasks.length
                   }}
                 </span>
+                <!-- ATTACHMENT BADGE -->
                 <span
-                  v-if="task.attachments?.length"
+                  v-if="
+                    (task.attachment_count ?? 0) > 0 || task.attachments?.length
+                  "
                   class="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-gray-100 text-gray-500"
                 >
-                  📎 {{ task.attachments.length }}
+                  📎
+                  {{ task.attachment_count ?? task.attachments?.length ?? 0 }}
                 </span>
               </div>
 
@@ -1688,6 +1692,7 @@ interface Task {
     type: string;
     url: string | null;
   }[];
+  attachment_count?: number;
   time?: string;
   dueDate?: string;
   label?: string;
@@ -2871,6 +2876,7 @@ async function loadTaskDetails(task: Task) {
       type: a.type,
       url: a.file_url,
     }));
+    task.attachment_count = task.attachments.length;
   } catch {
     // Biarkan data lokal jika error
   } finally {
@@ -3010,6 +3016,7 @@ async function handleUploadFile(event: Event) {
       type: att.type ?? "image",
       url: att.file_url ?? null,
     });
+    selectedTask.value.attachment_count = selectedTask.value.attachments.length;
     await refreshActivityAfterAction();
     showToast(`File "${file.name}" uploaded!`);
   } catch (e: any) {
@@ -3037,6 +3044,8 @@ async function handleAddLink() {
       type: att?.type ?? "link",
       url: att?.file_url ?? url,
     });
+    selectedTask.value.attachment_count = selectedTask.value.attachments.length;
+
     await refreshActivityAfterAction();
     showToast(`Link "${title}" added!`);
     attachLinkTitle.value = "";
@@ -3052,13 +3061,17 @@ async function handleAddLink() {
 async function handleDeleteAttachment(attachId: string | null, index: number) {
   if (!attachId) return;
   try {
-    // const att = selectedTask.value?.attachments?.[index];
     await apiDeleteAttachment(attachId, boardId);
     selectedTask.value?.attachments?.splice(index, 1);
+    if (selectedTask.value) {
+      // ✅ Synchronize count
+      selectedTask.value.attachment_count =
+        selectedTask.value.attachments.length;
+    }
     await refreshActivityAfterAction();
     showToast("Attachment deleted.");
   } catch (e: any) {
-    showToast(apiErrorMessage(e, "Gagal menghapus attachment."));
+    showToast(apiErrorMessage(e, "Gagal menghapus komentar."));
   }
 }
 

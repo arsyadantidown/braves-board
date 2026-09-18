@@ -226,6 +226,8 @@ export const useAppStore = defineStore(
         labels: task.labels ?? [],
         activity: task.activity ?? [],
         attachments: task.attachments ?? [],
+        attachment_count:
+          task.attachment_count ?? task.attachments?.length ?? 0,
         time:
           task.time ??
           (task.total_duration != null
