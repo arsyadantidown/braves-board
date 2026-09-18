@@ -2,12 +2,13 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import {
   getBoards,
+  getBoardDetail,
   createBoard as apiCreateBoard,
   updateBoard as apiUpdateBoard,
   deleteBoard as apiDeleteBoard,
   getUsers as apiGetUsers,
 } from "../api/board.api";
-import { getColumns, createColumn as apiCreateColumn } from "../api/column.api";
+import { createColumn as apiCreateColumn } from "../api/column.api";
 import { mapLimit } from "../../../app/async";
 import {
   getTasks,
@@ -169,42 +170,23 @@ export const useAppStore = defineStore(
 
     async function fetchColumns(boardId: string, force = false) {
       if (blockedBoardIds.value.has(boardId)) {
-        // Board sudah ketahuan tidak bisa diakses di sesi ini — jangan tembak
-        // endpoint lagi (mencegah GET /columns?board_id=... 403 berulang tiap
-        // Dashboard/TimeTracker mount). Ini hanya penyembunyian sementara;
-        // fetchBoards() akan mencabut blokir ini kalau akses sudah pulih.
         throw new Error("BOARD_ACCESS_BLOCKED");
       }
       if (columnsByBoard.value[boardId] && !force) return;
       try {
-        const cols = await getColumns(boardId);
-        // GET /columns TIDAK mengembalikan task sama sekali (backend
-        // column/use_cases.get_all_by_board_id hanya kirim id/title/position).
-        // Jadi task card HARUS diambil terpisah dari GET /tasks?column_id=...
-        // (task/use_cases.get_tasks_by_column) — endpoint itu mengembalikan
-        // SEMUA task non-archived TERMASUK yang is_completed=true. Dulu card
-        // hanya "ada" karena columnsByBoard di-persist ke localStorage; setelah
-        // localStorage tidak lagi jadi sumber, card wajib di-fetch dari API di
-        // sini, kalau tidak semua card (bukan cuma yang completed) akan hilang.
-        const taskLists = await mapLimit(cols, 4, (col: any) =>
-          getTasks(col.id, boardId),
-        );
-        columnsByBoard.value[boardId] = cols.map((col: any, i: number) => ({
+        // 🚀 Cukup 1 Hit API GET /boards/{boardId} untuk mengambil seluruh kolom & task sekaligus
+        const detail = await getBoardDetail(boardId);
+        const boardData = detail?.board ?? detail ?? {};
+        const cols = boardData.columns ?? [];
+
+        columnsByBoard.value[boardId] = cols.map((col: any) => ({
           id: col.id,
           title: col.title,
-          // columnId dioper eksplisit: response GET /tasks tidak menyertakan
-          // column_id, padahal drag-drop & resolusi board butuh field itu.
-          tasks: normalizeTaskList(taskLists[i] ?? [], col.id),
+          tasks: normalizeTaskList(col.tasks ?? [], col.id),
         }));
       } catch (e: any) {
         console.error("fetchColumns RAW error:", e);
         if (e?.response?.status === 403) {
-          // 403 di sini kemungkinan besar transient (akses sesaat dicabut /
-          // race saat undangan diproses). Sembunyikan board HANYA untuk sesi
-          // berjalan lewat blockedBoardIds (in-memory, tidak di-persist) supaya
-          // endpoint columns tidak ditembak berulang. JANGAN hapus board dari
-          // boards.value — itu sumber data dari API; menghapusnya dulu bikin
-          // board hilang permanen dari UI. Cache column yang gagal dibuang saja.
           blockedBoardIds.value.add(boardId);
           delete columnsByBoard.value[boardId];
         }
@@ -352,15 +334,20 @@ export const useAppStore = defineStore(
       return normalized;
     }
 
-    async function editTask(taskId: string, payload: object) {
+    async function editTask(taskId: string, payload: any) {
       const boardId = findBoardIdForTask(taskId);
       if (!boardId) throw new Error("Board tidak ditemukan untuk task ini.");
       await apiUpdateTask(taskId, payload, boardId);
       const found = findTaskInStore(taskId);
       if (found) {
+        const updateData: any = { ...payload };
+        // Pastikan dueDate (camelCase) ter-update di store agar kartu di boardview langsung berubah
+        if ("due_date" in payload || "dueDate" in payload) {
+          updateData.dueDate = payload.due_date ?? payload.dueDate ?? "-";
+        }
         found.col.tasks[found.idx] = {
           ...found.col.tasks[found.idx],
-          ...payload,
+          ...updateData,
         };
       }
     }

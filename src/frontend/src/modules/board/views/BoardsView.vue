@@ -89,7 +89,7 @@
         ghost-class="opacity-40"
         chosen-class="shadow-lg"
         handle=".column-drag-handle"
-        class="flex gap-3"
+        class="flex gap-3 items-start"
         @end="onColumnDragEnd"
       >
         <div
@@ -161,12 +161,27 @@
             </div>
           </div>
 
-          <!-- Task Cards -->
-          <!-- Task Cards -->
-          <div class="flex-1 overflow-y-auto px-2.5 py-2">
+          <!-- Task Cards (Auto height menyesuaikan isi) -->
+          <VueDraggable
+            v-model="board.tasks"
+            :group="{ name: 'tasks', pull: true, put: true }"
+            :data-column-id="board.id"
+            :animation="200"
+            ghost-class="opacity-40"
+            chosen-class="shadow-lg"
+            drag-class="rotate-1"
+            draggable=".task-card"
+            :fallback-on-body="true"
+            :empty-insert-threshold="30"
+            filter="button, input, a"
+            :prevent-on-filter="false"
+            class="overflow-y-auto px-2.5 py-1 flex flex-col gap-2 min-h-[30px]"
+            @end="onTaskDragEnd"
+          >
+            <!-- Teks No tasks tetap ada tapi compact -->
             <div
               v-if="!visibleTaskCount(board)"
-              class="text-xs text-gray-400 dark:text-gray-500 text-center py-8"
+              class="text-xs text-gray-400 dark:text-gray-500 text-center py-4 pointer-events-none select-none"
             >
               {{
                 onlyMyTasks && board.tasks?.length
@@ -175,171 +190,161 @@
               }}
             </div>
 
-            <VueDraggable
-              v-model="board.tasks"
-              group="tasks"
-              :data-column-id="board.id"
-              :animation="150"
-              ghost-class="opacity-40"
-              chosen-class="shadow-lg"
-              class="flex flex-col gap-2 min-h-[40px]"
-              @end="onTaskDragEnd"
+            <!-- Task Card Item -->
+            <div
+              v-for="task in board.tasks as Task[]"
+              v-show="isTaskVisible(task)"
+              :key="task.id"
+              :data-id="task.id"
+              class="task-card rounded-lg border p-3 cursor-grab active:cursor-grabbing hover:border-blue-400 hover:shadow-md transition-all group"
+              :class="
+                task.is_completed
+                  ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-600/50'
+                  : 'bg-white dark:bg-gray-700/60 border-gray-200 dark:border-gray-600'
+              "
+              @click="openModal(task)"
             >
-              <div
-                v-for="task in board.tasks as Task[]"
-                v-show="isTaskVisible(task)"
-                :key="task.id"
-                :data-id="task.id"
-                class="rounded-lg border p-3 cursor-grab active:cursor-grabbing hover:border-blue-400 hover:shadow-md transition-all group"
-                :class="
-                  task.is_completed
-                    ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-600/50'
-                    : 'bg-white dark:bg-gray-700/60 border-gray-200 dark:border-gray-600'
-                "
-                @click="openModal(task)"
-              >
-                <div v-if="task.label" class="mb-2">
-                  <span
-                    class="inline-block text-[11px] font-medium px-2.5 py-0.5 rounded-full"
-                    :class="task.labelClass ?? 'bg-green-100 text-green-700'"
-                    >{{ task.label }}</span
-                  >
-                </div>
+              <div v-if="task.label" class="mb-2">
+                <span
+                  class="inline-block text-[11px] font-medium px-2.5 py-0.5 rounded-full"
+                  :class="task.labelClass ?? 'bg-green-100 text-green-700'"
+                  >{{ task.label }}</span
+                >
+              </div>
 
-                <div class="flex items-start gap-1.5 mb-2">
-                  <!-- Toggle complete ala Trello: lingkaran hanya muncul saat hover
+              <div class="flex items-start gap-1.5 mb-2">
+                <!-- Toggle complete ala Trello: lingkaran hanya muncul saat hover
                      kartu; kalau sudah completed centangnya tetap terlihat permanen.
                      Klik TIDAK membuka card detail (stop propagation). Reuse penuh
                      store.setTaskCompleteInStore — tidak ada logika/state baru. -->
-                  <button
-                    type="button"
-                    @click.stop="handleCardToggleComplete(task)"
-                    :title="
-                      task.is_completed
-                        ? 'Mark as incomplete'
-                        : 'Mark as complete'
-                    "
-                    class="mt-0.5 flex-shrink-0 flex items-center justify-center w-[15px] h-[15px] rounded-full cursor-pointer transition-opacity duration-200 focus:outline-none focus-visible:opacity-100"
-                    :class="
-                      task.is_completed
-                        ? 'opacity-100'
-                        : 'opacity-0 group-hover:opacity-100'
-                    "
+                <button
+                  type="button"
+                  @click.stop="handleCardToggleComplete(task)"
+                  :title="
+                    task.is_completed
+                      ? 'Mark as incomplete'
+                      : 'Mark as complete'
+                  "
+                  class="mt-0.5 flex-shrink-0 flex items-center justify-center w-[15px] h-[15px] rounded-full cursor-pointer transition-opacity duration-200 focus:outline-none focus-visible:opacity-100"
+                  :class="
+                    task.is_completed
+                      ? 'opacity-100'
+                      : 'opacity-0 group-hover:opacity-100'
+                  "
+                >
+                  <font-awesome-icon
+                    v-if="task.is_completed"
+                    icon="circle-check"
+                    class="text-emerald-500 text-[15px]"
+                  />
+                  <span
+                    v-else
+                    class="block w-[15px] h-[15px] rounded-full border-2 border-gray-300 dark:border-gray-500 hover:border-emerald-500 dark:hover:border-emerald-400 transition-colors"
+                  ></span>
+                </button>
+                <p
+                  class="text-sm leading-snug font-normal"
+                  :class="
+                    task.is_completed
+                      ? 'text-emerald-800 dark:text-emerald-200'
+                      : 'text-gray-800 dark:text-gray-100'
+                  "
+                >
+                  {{ task.title }}
+                </p>
+              </div>
+
+              <div class="flex flex-wrap gap-1.5 mb-2">
+                <span
+                  v-if="task.dueDate && task.dueDate !== '-'"
+                  class="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded"
+                  :class="dueDateBadgeClass(dueDateStatus(task.dueDate))"
+                >
+                  <svg
+                    class="w-3 h-3"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
                   >
-                    <font-awesome-icon
-                      v-if="task.is_completed"
-                      icon="circle-check"
-                      class="text-emerald-500 text-[15px]"
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
                     />
-                    <span
-                      v-else
-                      class="block w-[15px] h-[15px] rounded-full border-2 border-gray-300 dark:border-gray-500 hover:border-emerald-500 dark:hover:border-emerald-400 transition-colors"
-                    ></span>
-                  </button>
-                  <p
-                    class="text-sm leading-snug font-normal"
-                    :class="
-                      task.is_completed
-                        ? 'text-emerald-800 dark:text-emerald-200'
-                        : 'text-gray-800 dark:text-gray-100'
-                    "
-                  >
-                    {{ task.title }}
-                  </p>
-                </div>
+                  </svg>
+                  {{ formatLogDate(task.dueDate) }}
+                </span>
+                <span
+                  v-if="task.subtasks?.length"
+                  class="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded"
+                  :class="
+                    task.subtasks.filter((s) => s.completed).length ===
+                    task.subtasks.length
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-gray-100 text-gray-500'
+                  "
+                >
+                  ✓ {{ task.subtasks.filter((s) => s.completed).length }}/{{
+                    task.subtasks.length
+                  }}
+                </span>
+                <span
+                  v-if="task.attachments?.length"
+                  class="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-gray-100 text-gray-500"
+                >
+                  📎 {{ task.attachments.length }}
+                </span>
+              </div>
 
-                <div class="flex flex-wrap gap-1.5 mb-2">
+              <div class="flex items-center justify-between mt-1">
+                <div
+                  class="flex items-center gap-1 text-[11px] tabular-nums"
+                  :class="
+                    activeTimerTaskId === task.id
+                      ? 'text-emerald-600 font-medium'
+                      : 'text-gray-400'
+                  "
+                >
                   <span
-                    v-if="task.dueDate && task.dueDate !== '-'"
-                    class="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded"
-                    :class="dueDateBadgeClass(dueDateStatus(task.dueDate))"
-                  >
-                    <svg
-                      class="w-3 h-3"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                      />
-                    </svg>
-                    {{ formatLogDate(task.dueDate) }}
-                  </span>
-                  <span
-                    v-if="task.subtasks?.length"
-                    class="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded"
-                    :class="
-                      task.subtasks.filter((s) => s.completed).length ===
-                      task.subtasks.length
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-gray-100 text-gray-500'
-                    "
-                  >
-                    ✓ {{ task.subtasks.filter((s) => s.completed).length }}/{{
-                      task.subtasks.length
-                    }}
-                  </span>
-                  <span
-                    v-if="task.attachments?.length"
-                    class="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-gray-100 text-gray-500"
-                  >
-                    📎 {{ task.attachments.length }}
-                  </span>
-                </div>
-
-                <div class="flex items-center justify-between mt-1">
-                  <div
-                    class="flex items-center gap-1 text-[11px] tabular-nums"
+                    class="w-1.5 h-1.5 rounded-full"
                     :class="
                       activeTimerTaskId === task.id
-                        ? 'text-emerald-600 font-medium'
-                        : 'text-gray-400'
+                        ? 'bg-emerald-500 animate-pulse'
+                        : 'bg-gray-300'
                     "
+                  ></span>
+                  {{ task.time || "00:00:00" }}
+                  <button
+                    class="ml-1 text-[10px] px-1.5 py-0.5 rounded border transition"
+                    :class="
+                      activeTimerTaskId === task.id
+                        ? 'border-red-200 text-red-500 bg-red-50 hover:bg-red-100'
+                        : 'border-gray-200 text-gray-400 hover:bg-gray-100'
+                    "
+                    @click.stop="handleTimerToggle(task)"
                   >
-                    <span
-                      class="w-1.5 h-1.5 rounded-full"
-                      :class="
-                        activeTimerTaskId === task.id
-                          ? 'bg-emerald-500 animate-pulse'
-                          : 'bg-gray-300'
-                      "
-                    ></span>
-                    {{ task.time || "00:00:00" }}
-                    <button
-                      class="ml-1 text-[10px] px-1.5 py-0.5 rounded border transition"
-                      :class="
-                        activeTimerTaskId === task.id
-                          ? 'border-red-200 text-red-500 bg-red-50 hover:bg-red-100'
-                          : 'border-gray-200 text-gray-400 hover:bg-gray-100'
-                      "
-                      @click.stop="handleTimerToggle(task)"
-                    >
-                      {{ activeTimerTaskId === task.id ? "⏹" : "▶" }}
-                    </button>
-                  </div>
-                  <div class="flex">
-                    <div
-                      v-for="(m, mi) in resolveMembers(task.assignee_ids).slice(
-                        0,
-                        3,
-                      )"
-                      :key="mi"
-                      class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white border-2 border-white"
-                      :class="m.color"
-                      :style="(mi as number) > 0 ? 'margin-left: -6px' : ''"
-                      :title="m.name"
-                    >
-                      {{ m.initial }}
-                    </div>
+                    {{ activeTimerTaskId === task.id ? "⏹" : "▶" }}
+                  </button>
+                </div>
+                <div class="flex">
+                  <div
+                    v-for="(m, mi) in resolveMembers(task.assignee_ids).slice(
+                      0,
+                      3,
+                    )"
+                    :key="mi"
+                    class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white border-2 border-white"
+                    :class="m.color"
+                    :style="(mi as number) > 0 ? 'margin-left: -6px' : ''"
+                    :title="m.name"
+                  >
+                    {{ m.initial }}
                   </div>
                 </div>
               </div>
-            </VueDraggable>
-          </div>
+            </div>
+          </VueDraggable>
 
           <!-- Add Card button -->
           <div v-if="canCreateTask" class="mx-2.5 mb-2.5 mt-1">
@@ -737,6 +742,7 @@
                     </span>
                     <input
                       type="date"
+                      :min="minDate"
                       :value="dueDateInputValue(selectedTask.dueDate)"
                       @change="handleDueDateChange"
                       class="text-sm text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 px-2.5 py-1.5 rounded-lg transition outline-none"
@@ -1576,6 +1582,7 @@ import { VueDraggable } from "vue-draggable-plus";
 import {
   moveTask as apiMoveTask,
   getTaskDetail as apiGetTaskDetail,
+  reorderTask as apiReorderTask,
   getTaskActivities as apiGetTaskActivities,
 } from "../api/task.api";
 import {
@@ -1711,6 +1718,14 @@ library.add(
   faFilter,
 );
 
+const minDate = computed(() => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+});
+
 const route = useRoute();
 const router = useRouter();
 const boardId = route.params.boardId as string;
@@ -1754,8 +1769,7 @@ function visibleTaskCount(board: { tasks?: { id: string }[] }) {
     : tasks.length;
 }
 
-async function toggleMyTasksFilter() {
-  if (myTasksFilterLoading.value) return;
+function toggleMyTasksFilter() {
   if (onlyMyTasks.value) {
     onlyMyTasks.value = false;
     myTaskIds.value = new Set();
@@ -1766,15 +1780,19 @@ async function toggleMyTasksFilter() {
     showToast("Data user belum termuat, coba lagi sebentar.");
     return;
   }
-  myTasksFilterLoading.value = true;
-  try {
-    myTaskIds.value = await store.fetchTaskIdsByAssignee(boardId, myId);
-    onlyMyTasks.value = true;
-  } catch (e: any) {
-    showToast(apiErrorMessage(e, "Gagal memuat filter task."));
-  } finally {
-    myTasksFilterLoading.value = false;
+
+  // ✅ Filter lokal dari store tanpa request HTTP ke backend
+  const ids = new Set<string>();
+  const cols = columnsByBoard.value[boardId] ?? [];
+  for (const col of cols) {
+    for (const t of col.tasks ?? []) {
+      if (t.assignee_ids?.includes(myId)) {
+        ids.add(t.id);
+      }
+    }
   }
+  myTaskIds.value = ids;
+  onlyMyTasks.value = true;
 }
 
 // ─── Task State ───────────────────────────────────────────────
@@ -1841,10 +1859,14 @@ async function handleDueDateChange(e: Event) {
   if (!selectedTask.value) return;
   const value = (e.target as HTMLInputElement).value;
   const iso = value ? new Date(`${value}T00:00:00`).toISOString() : null;
+  const taskToUpdate = selectedTask.value;
   try {
-    await store.editTask(selectedTask.value.id, { due_date: iso });
-    selectedTask.value.dueDate = iso ?? "-";
-    await refreshActivityAfterAction();
+    await store.editTask(taskToUpdate.id, { due_date: iso });
+    taskToUpdate.dueDate = iso ?? "-";
+    const storeTask = findTaskById(taskToUpdate.id);
+    if (storeTask) storeTask.dueDate = iso ?? "-";
+
+    refreshActivityAfterAction();
     showToast("Due date diperbarui.");
   } catch (err: any) {
     showToast(apiErrorMessage(err, "Gagal mengubah due date."));
@@ -2144,31 +2166,59 @@ async function onTaskDragEnd(event: any) {
   const taskId = event.item?.dataset?.id;
   const toColumnId = event.to?.dataset?.columnId;
   const fromColumnId = event.from?.dataset?.columnId;
-  const newIndex = event.newIndex ?? 0;
+  const oldIndex = event.oldIndex;
+  const newIndex = event.newIndex;
 
-  console.log("drag end:", { taskId, fromColumnId, toColumnId, newIndex });
+  if (!taskId || !toColumnId) return;
 
-  if (!taskId || !toColumnId || fromColumnId === toColumnId) return;
+  // 1. VALIDASI: Jika kolom sama DAN posisinya tidak berubah (batal pindah), JANGAN panggil API
+  if (fromColumnId === toColumnId && oldIndex === newIndex) {
+    return;
+  }
+
+  const targetPosition = (newIndex ?? 0) + 1;
 
   try {
-    await apiMoveTask(taskId, toColumnId, newIndex + 1, boardId);
+    if (fromColumnId === toColumnId) {
+      // 2. Reorder dalam kolom yang sama (PATCH /api/v1/tasks/{taskId}/reorder)
+      await apiReorderTask(taskId, targetPosition, boardId);
+      showToast("Urutan task diperbarui!");
+    } else {
+      // 3. Pindah ke kolom lain (PATCH /api/v1/tasks/{taskId}/move)
+      await apiMoveTask(taskId, toColumnId, targetPosition, boardId);
+
+      // Sinkronkan column_id pada objek kartu lokal
+      const task = findTaskById(taskId);
+      if (task) {
+        task.column_id = toColumnId;
+      }
+      showToast("Task moved!");
+    }
+
     if (selectedTask.value?.id === taskId) {
       await refreshActivityAfterAction();
     }
-
-    showToast("Task moved!");
   } catch (e: any) {
     showToast(apiErrorMessage(e, "Gagal memindahkan task."));
-    // JANGAN fetch ulang — biarkan vue-draggable handle UI
   }
 }
 
 async function onColumnDragEnd(event: any) {
-  const columnId = columnsByBoard.value[boardId]?.[event.newIndex]?.id;
+  const oldIndex = event.oldIndex;
+  const newIndex = event.newIndex;
+
+  // 1. VALIDASI: Jika posisi tidak berubah (batal pindah), JANGAN panggil API
+  if (oldIndex === newIndex) {
+    return;
+  }
+
+  const columnId = columnsByBoard.value[boardId]?.[newIndex]?.id;
   if (!columnId) return;
 
   try {
-    await apiReorderColumn(columnId, event.newIndex + 1, boardId);
+    // 2. Panggil API Reorder Kolom
+    await apiReorderColumn(columnId, newIndex + 1, boardId);
+    showToast("Urutan kolom diperbarui!");
   } catch (e: any) {
     showToast(apiErrorMessage(e, "Gagal mengubah urutan column."));
     // JANGAN fetch ulang — biarkan vue-draggable handle UI
@@ -2350,6 +2400,12 @@ async function doStopTimer(taskId: string) {
 
 async function loadTimerLogs(taskId: string) {
   if (!taskId) return;
+  const task = findTaskById(taskId);
+  // Hemat kuota rate limit: Skip request API jika task belum pernah punya timer
+  if (task && !task.total_duration && !task.is_timer_running) {
+    timerLogs.value = [];
+    return;
+  }
   timerLogsLoading.value = true;
   timerLogsError.value = "";
   try {
@@ -2742,24 +2798,45 @@ function openModal(task: Task) {
     title: task.title,
     description: task.description ?? "",
   };
-
   timerLogs.value = [];
   timerLogsError.value = "";
   timerDescription.value = "";
+  // 🚀 HIT SEMUA API GET SAAT OPEN MODAL
   loadTimerLogs(task.id);
-  loadPersistedComments(task);
+  loadTaskDetails(task);
   loadPersistedActivities(task);
 }
 
 // Card list dari backend tidak menyertakan komentar — hanya GET /tasks/{id}
 // (TaskDetailResponse) yang punya. Tarik saat modal dibuka supaya tab Comments
 // menampilkan komentar tersimpan, bukan cuma yang diketik di sesi ini.
-async function loadPersistedComments(task: Task) {
+async function loadTaskDetails(task: Task) {
   commentsLoading.value = true;
   try {
     const detail = await apiGetTaskDetail(task.id, boardId);
-    // Modal keburu ditutup / ganti card sebelum request selesai.
     if (selectedTask.value?.id !== task.id) return;
+
+    // A. Update Description & Due Date dari server
+    if (detail?.description !== undefined)
+      task.description = detail.description ?? "";
+    if (detail?.due_date !== undefined) task.dueDate = detail.due_date ?? "-";
+
+    // B. ✅ TAMBAHKAN INI: Update Status Complete & Member Assignee dari server
+    if (detail?.is_completed !== undefined)
+      task.is_completed = detail.is_completed ?? false;
+    if (detail?.assignee_ids !== undefined)
+      task.assignee_ids = detail.assignee_ids ?? [];
+
+    // C. Update Subtasks dari server (termasuk yang completed)
+    if (detail?.subtasks) {
+      task.subtasks = detail.subtasks.map((s: any) => ({
+        id: s.id,
+        title: s.title,
+        completed: s.is_completed ?? s.completed ?? false,
+      }));
+    }
+
+    // D. Update Comments dari server
     const comments = (detail?.comments ?? [])
       .map(
         (c: any): ActivityItem => ({
@@ -2779,21 +2856,15 @@ async function loadPersistedComments(task: Task) {
           createdAt: new Date(c.created_at).getTime() || 0,
         }),
       )
-      // Urutkan sumber berdasarkan waktu (terbaru dulu). Sebelumnya sort pakai
-      // `id.localeCompare` yang acak karena id bukan urut-waktu.
       .sort(
         (a: ActivityItem, b: ActivityItem) =>
           (b.createdAt ?? 0) - (a.createdAt ?? 0),
       );
-    // Pertahankan log aktivitas sesi (item tanpa .comment); ganti bagian komentar
-    // dengan data backend agar tidak dobel dengan komentar yang tadi diketik.
+
     const sessionLogs = task.activity.filter((a) => !a.comment);
     task.activity = [...comments, ...sessionLogs];
 
-    // Attachment juga hanya ada di GET /tasks/{id} (list /tasks tidak mengirim
-    // arraynya), jadi WAJIB dipetakan di sini — kalau tidak, attachment hilang
-    // setelah refresh. Backend pakai file_name & file_url; FE pakai title & url.
-    // Simpan id & type asli supaya bisa dihapus (dan bedakan link vs file).
+    // E. Update Attachments dari server
     task.attachments = (detail?.attachments ?? []).map((a: any) => ({
       id: a.id,
       title: a.file_name,
@@ -2801,11 +2872,12 @@ async function loadPersistedComments(task: Task) {
       url: a.file_url,
     }));
   } catch {
-    // Diamkan — biarkan feed sesi apa adanya kalau gagal memuat.
+    // Biarkan data lokal jika error
   } finally {
     if (selectedTask.value?.id === task.id) commentsLoading.value = false;
   }
 }
+
 async function loadPersistedActivities(task: Task) {
   activityLoading.value = true;
 
@@ -2852,10 +2924,18 @@ async function loadPersistedActivities(task: Task) {
   }
 }
 
-async function refreshActivityAfterAction() {
+let activityDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+function refreshActivityAfterAction() {
   if (!selectedTask.value) return;
 
-  await loadPersistedActivities(selectedTask.value);
+  if (activityDebounceTimer) clearTimeout(activityDebounceTimer);
+
+  activityDebounceTimer = setTimeout(() => {
+    if (selectedTask.value) {
+      loadPersistedActivities(selectedTask.value);
+    }
+  }, 500);
 }
 
 function closeModal() {
@@ -2896,7 +2976,7 @@ async function handleAddComment() {
     });
     newComment.value = "";
     // Reconcile dengan backend supaya komentar baru dapat id asli (untuk delete).
-    loadPersistedComments(selectedTask.value);
+    loadTaskDetails(selectedTask.value);
   } catch (e: any) {
     showToast(apiErrorMessage(e, "Gagal mengirim komentar."));
   } finally {
