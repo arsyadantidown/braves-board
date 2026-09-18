@@ -177,11 +177,14 @@
 
             <VueDraggable
               v-model="board.tasks"
-              group="tasks"
+              :group="{ name: 'tasks', pull: true, put: true }"
               :data-column-id="board.id"
-              :animation="150"
+              :animation="200"
               ghost-class="opacity-40"
               chosen-class="shadow-lg"
+              :fallback-on-body="true"
+              filter="button, input, a"
+              :prevent-on-filter="false"
               class="flex flex-col gap-2 min-h-[40px]"
               @end="onTaskDragEnd"
             >
@@ -1577,6 +1580,7 @@ import { VueDraggable } from "vue-draggable-plus";
 import {
   moveTask as apiMoveTask,
   getTaskDetail as apiGetTaskDetail,
+  reorderTask as apiReorderTask,
   getTaskActivities as apiGetTaskActivities,
 } from "../api/task.api";
 import {
@@ -2160,22 +2164,40 @@ async function onTaskDragEnd(event: any) {
   const taskId = event.item?.dataset?.id;
   const toColumnId = event.to?.dataset?.columnId;
   const fromColumnId = event.from?.dataset?.columnId;
-  const newIndex = event.newIndex ?? 0;
+  const oldIndex = event.oldIndex;
+  const newIndex = event.newIndex;
 
-  console.log("drag end:", { taskId, fromColumnId, toColumnId, newIndex });
+  if (!taskId || !toColumnId) return;
 
-  if (!taskId || !toColumnId || fromColumnId === toColumnId) return;
+  // 1. VALIDASI: Jika kolom sama DAN posisinya tidak berubah (batal pindah), JANGAN panggil API
+  if (fromColumnId === toColumnId && oldIndex === newIndex) {
+    return;
+  }
+
+  const targetPosition = (newIndex ?? 0) + 1;
 
   try {
-    await apiMoveTask(taskId, toColumnId, newIndex + 1, boardId);
+    if (fromColumnId === toColumnId) {
+      // 2. Reorder dalam kolom yang sama (PATCH /api/v1/tasks/{taskId}/reorder)
+      await apiReorderTask(taskId, targetPosition, boardId);
+      showToast("Urutan task diperbarui!");
+    } else {
+      // 3. Pindah ke kolom lain (PATCH /api/v1/tasks/{taskId}/move)
+      await apiMoveTask(taskId, toColumnId, targetPosition, boardId);
+
+      // Sinkronkan column_id pada objek kartu lokal
+      const task = findTaskById(taskId);
+      if (task) {
+        task.column_id = toColumnId;
+      }
+      showToast("Task moved!");
+    }
+
     if (selectedTask.value?.id === taskId) {
       await refreshActivityAfterAction();
     }
-
-    showToast("Task moved!");
   } catch (e: any) {
     showToast(apiErrorMessage(e, "Gagal memindahkan task."));
-    // JANGAN fetch ulang — biarkan vue-draggable handle UI
   }
 }
 
