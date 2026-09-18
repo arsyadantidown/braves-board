@@ -94,6 +94,14 @@ class TaskRepository:
     ) -> Sequence[Task]:
         stmt = (
             select(Task)
+            .options(
+                selectinload(
+                    Task.subtasks.and_(
+                        Subtask.deleted_at.is_(None)
+                    )
+                ),
+                selectinload(Task.attachments)
+            )
             .join(Column, Task.column_id == Column.id)
             .where(
                 Column.board_id == board_id,

@@ -7,6 +7,7 @@ from app.api.board.repository import BoardRepository
 from app.api.board.use_cases import BoardUseCase
 from app.api.board.schema import BoardCreate, BoardUpdate
 from app.api.depedencies import get_current_user
+from app.core.dependencies import require_permission
 from app.models.user_model import User
 from app.api.standard_response import success_response
 
@@ -50,20 +51,25 @@ async def update_board(
     board_id: uuid.UUID,
     update_data: BoardUpdate,
     use_case: BoardUseCase = Depends(get_board_use_case),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(
+        require_permission("board.update")
+    ),
 ):
     result = await use_case.update(
         board_id,
         update_data.model_dump(exclude_unset=True),
         current_user.id,
     )
+
     return success_response(result)
 
 @router.delete("/{board_id}", status_code=status.HTTP_200_OK)
 async def delete_board(
     board_id: uuid.UUID,
     use_case: BoardUseCase = Depends(get_board_use_case),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(
+        require_permission("board.delete")
+    ),
 ):
     await use_case.delete(board_id, current_user.id)
     return success_response(None)

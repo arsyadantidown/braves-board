@@ -140,6 +140,7 @@ class TaskDetailResponse(TaskBase):
     subtasks: List[SubtaskNestedResponse] = []
     comments: List[CommentNestedResponse] = []
     attachments: List[AttachmentNestedResponse] = []
+    attachment_count: int = 0
 
     model_config = ConfigDict(from_attributes=True)
 

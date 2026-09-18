@@ -185,8 +185,10 @@ class BoardUseCase:
         await self._sync_lazy_timers(tasks)
 
         tasks_by_column = {}
+
         for task in tasks:
             col_id = str(task.column_id)
+
             if col_id not in tasks_by_column:
                 tasks_by_column[col_id] = []
 
@@ -195,6 +197,19 @@ class BoardUseCase:
                 "title": task.title,
                 "column_id": str(task.column_id),
                 "position": task.position,
+                "due_date": task.due_date,
+                "is_completed": task.is_completed,
+                "assignee_ids": task.assignee_ids,
+                "subtasks": [
+                    {
+                        "id": str(subtask.id),
+                        "title": subtask.title,
+                        "is_completed": subtask.is_completed,
+                        "position": subtask.position,
+                    }
+                    for subtask in task.subtasks
+                ],
+                "attachment_count": len(task.attachments),
                 "is_timer_running": getattr(task, "is_timer_running", False),
                 "total_duration": getattr(task, "total_duration", 0),
                 "created_at": task.created_at,

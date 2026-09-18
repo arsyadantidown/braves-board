@@ -85,7 +85,6 @@ class BoardRepository:
             update(Board)
             .where(
                 Board.id == board_id,
-                Board.user_id == user_id,
                 Board.deleted_at.is_(None)
             )
             .values(**filtered_data, updated_at=datetime.now(timezone.utc))
@@ -96,17 +95,23 @@ class BoardRepository:
         await self.session.commit()
         return result.scalar_one_or_none()
 
-    async def soft_delete(self, board_id: uuid.UUID, user_id: uuid.UUID) -> bool:
+    async def soft_delete(
+        self,
+        board_id: uuid.UUID,
+        user_id: uuid.UUID,
+    ) -> bool:
         stmt = (
             update(Board)
             .where(
                 Board.id == board_id,
-                Board.user_id == user_id,
                 Board.deleted_at.is_(None)
             )
-            .values(deleted_at=datetime.now(timezone.utc))
+            .values(
+                deleted_at=datetime.now(timezone.utc)
+            )
         )
 
         result = await self.session.execute(stmt)
         await self.session.commit()
+
         return result.rowcount > 0

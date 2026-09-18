@@ -150,9 +150,13 @@ class TaskUseCase:
         if not task:
             raise TaskNotFoundException()
 
-        return TaskDetailResponse.model_validate(
+        response = TaskDetailResponse.model_validate(
             task
         ).model_dump(mode="json")
+
+        response["attachment_count"] = len(task.attachments)
+
+        return response
 
     async def update_task(
         self,
@@ -165,7 +169,6 @@ class TaskUseCase:
         if not task:
             raise TaskNotFoundException()
 
-        # Snapshot old values before update
         old_title = task.title
         old_description = task.description
         old_due_date = task.due_date
