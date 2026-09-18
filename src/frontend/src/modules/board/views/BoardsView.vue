@@ -89,7 +89,7 @@
         ghost-class="opacity-40"
         chosen-class="shadow-lg"
         handle=".column-drag-handle"
-        class="flex gap-3"
+        class="flex gap-3 items-start"
         @end="onColumnDragEnd"
       >
         <div
@@ -161,7 +161,7 @@
             </div>
           </div>
 
-          <!-- Task Cards (VueDraggable langsung sebagai container scroll) -->
+          <!-- Task Cards (Auto height menyesuaikan isi) -->
           <VueDraggable
             v-model="board.tasks"
             :group="{ name: 'tasks', pull: true, put: true }"
@@ -175,13 +175,13 @@
             :empty-insert-threshold="30"
             filter="button, input, a"
             :prevent-on-filter="false"
-            class="flex-1 overflow-y-auto px-2.5 py-2 flex flex-col gap-2"
+            class="overflow-y-auto px-2.5 py-1 flex flex-col gap-2 min-h-[30px]"
             @end="onTaskDragEnd"
           >
-            <!-- Empty State jika tidak ada kartu (hanya teks bersih tanpa memicu scrollbar) -->
+            <!-- Teks No tasks tetap ada tapi compact -->
             <div
               v-if="!visibleTaskCount(board)"
-              class="text-xs text-gray-400 dark:text-gray-500 text-center py-8 pointer-events-none select-none"
+              class="text-xs text-gray-400 dark:text-gray-500 text-center py-4 pointer-events-none select-none"
             >
               {{
                 onlyMyTasks && board.tasks?.length
@@ -190,7 +190,7 @@
               }}
             </div>
 
-            <!-- Task Card Item (Pastikan ada class 'task-card') -->
+            <!-- Task Card Item -->
             <div
               v-for="task in board.tasks as Task[]"
               v-show="isTaskVisible(task)"
