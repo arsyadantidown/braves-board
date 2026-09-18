@@ -2204,11 +2204,21 @@ async function onTaskDragEnd(event: any) {
 }
 
 async function onColumnDragEnd(event: any) {
-  const columnId = columnsByBoard.value[boardId]?.[event.newIndex]?.id;
+  const oldIndex = event.oldIndex;
+  const newIndex = event.newIndex;
+
+  // 1. VALIDASI: Jika posisi tidak berubah (batal pindah), JANGAN panggil API
+  if (oldIndex === newIndex) {
+    return;
+  }
+
+  const columnId = columnsByBoard.value[boardId]?.[newIndex]?.id;
   if (!columnId) return;
 
   try {
-    await apiReorderColumn(columnId, event.newIndex + 1, boardId);
+    // 2. Panggil API Reorder Kolom
+    await apiReorderColumn(columnId, newIndex + 1, boardId);
+    showToast("Urutan kolom diperbarui!");
   } catch (e: any) {
     showToast(apiErrorMessage(e, "Gagal mengubah urutan column."));
     // JANGAN fetch ulang — biarkan vue-draggable handle UI
