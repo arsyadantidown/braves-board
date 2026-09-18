@@ -161,12 +161,27 @@
             </div>
           </div>
 
-          <!-- Task Cards -->
-          <!-- Task Cards -->
-          <div class="flex-1 overflow-y-auto px-2.5 py-2">
+          <!-- Task Cards (VueDraggable langsung sebagai container scroll) -->
+          <VueDraggable
+            v-model="board.tasks"
+            :group="{ name: 'tasks', pull: true, put: true }"
+            :data-column-id="board.id"
+            :animation="200"
+            ghost-class="opacity-40"
+            chosen-class="shadow-lg"
+            drag-class="rotate-1"
+            draggable=".task-card"
+            :fallback-on-body="true"
+            :empty-insert-threshold="30"
+            filter="button, input, a"
+            :prevent-on-filter="false"
+            class="flex-1 overflow-y-auto px-2.5 py-2 flex flex-col gap-2"
+            @end="onTaskDragEnd"
+          >
+            <!-- Empty State jika tidak ada kartu (hanya teks bersih tanpa memicu scrollbar) -->
             <div
               v-if="!visibleTaskCount(board)"
-              class="text-xs text-gray-400 dark:text-gray-500 text-center py-8"
+              class="text-xs text-gray-400 dark:text-gray-500 text-center py-8 pointer-events-none select-none"
             >
               {{
                 onlyMyTasks && board.tasks?.length
@@ -175,174 +190,161 @@
               }}
             </div>
 
-            <VueDraggable
-              v-model="board.tasks"
-              :group="{ name: 'tasks', pull: true, put: true }"
-              :data-column-id="board.id"
-              :animation="200"
-              ghost-class="opacity-40"
-              chosen-class="shadow-lg"
-              :fallback-on-body="true"
-              filter="button, input, a"
-              :prevent-on-filter="false"
-              class="flex flex-col gap-2 min-h-[40px]"
-              @end="onTaskDragEnd"
+            <!-- Task Card Item (Pastikan ada class 'task-card') -->
+            <div
+              v-for="task in board.tasks as Task[]"
+              v-show="isTaskVisible(task)"
+              :key="task.id"
+              :data-id="task.id"
+              class="task-card rounded-lg border p-3 cursor-grab active:cursor-grabbing hover:border-blue-400 hover:shadow-md transition-all group"
+              :class="
+                task.is_completed
+                  ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-600/50'
+                  : 'bg-white dark:bg-gray-700/60 border-gray-200 dark:border-gray-600'
+              "
+              @click="openModal(task)"
             >
-              <div
-                v-for="task in board.tasks as Task[]"
-                v-show="isTaskVisible(task)"
-                :key="task.id"
-                :data-id="task.id"
-                class="rounded-lg border p-3 cursor-grab active:cursor-grabbing hover:border-blue-400 hover:shadow-md transition-all group"
-                :class="
-                  task.is_completed
-                    ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-600/50'
-                    : 'bg-white dark:bg-gray-700/60 border-gray-200 dark:border-gray-600'
-                "
-                @click="openModal(task)"
-              >
-                <div v-if="task.label" class="mb-2">
-                  <span
-                    class="inline-block text-[11px] font-medium px-2.5 py-0.5 rounded-full"
-                    :class="task.labelClass ?? 'bg-green-100 text-green-700'"
-                    >{{ task.label }}</span
-                  >
-                </div>
+              <div v-if="task.label" class="mb-2">
+                <span
+                  class="inline-block text-[11px] font-medium px-2.5 py-0.5 rounded-full"
+                  :class="task.labelClass ?? 'bg-green-100 text-green-700'"
+                  >{{ task.label }}</span
+                >
+              </div>
 
-                <div class="flex items-start gap-1.5 mb-2">
-                  <!-- Toggle complete ala Trello: lingkaran hanya muncul saat hover
+              <div class="flex items-start gap-1.5 mb-2">
+                <!-- Toggle complete ala Trello: lingkaran hanya muncul saat hover
                      kartu; kalau sudah completed centangnya tetap terlihat permanen.
                      Klik TIDAK membuka card detail (stop propagation). Reuse penuh
                      store.setTaskCompleteInStore — tidak ada logika/state baru. -->
-                  <button
-                    type="button"
-                    @click.stop="handleCardToggleComplete(task)"
-                    :title="
-                      task.is_completed
-                        ? 'Mark as incomplete'
-                        : 'Mark as complete'
-                    "
-                    class="mt-0.5 flex-shrink-0 flex items-center justify-center w-[15px] h-[15px] rounded-full cursor-pointer transition-opacity duration-200 focus:outline-none focus-visible:opacity-100"
-                    :class="
-                      task.is_completed
-                        ? 'opacity-100'
-                        : 'opacity-0 group-hover:opacity-100'
-                    "
+                <button
+                  type="button"
+                  @click.stop="handleCardToggleComplete(task)"
+                  :title="
+                    task.is_completed
+                      ? 'Mark as incomplete'
+                      : 'Mark as complete'
+                  "
+                  class="mt-0.5 flex-shrink-0 flex items-center justify-center w-[15px] h-[15px] rounded-full cursor-pointer transition-opacity duration-200 focus:outline-none focus-visible:opacity-100"
+                  :class="
+                    task.is_completed
+                      ? 'opacity-100'
+                      : 'opacity-0 group-hover:opacity-100'
+                  "
+                >
+                  <font-awesome-icon
+                    v-if="task.is_completed"
+                    icon="circle-check"
+                    class="text-emerald-500 text-[15px]"
+                  />
+                  <span
+                    v-else
+                    class="block w-[15px] h-[15px] rounded-full border-2 border-gray-300 dark:border-gray-500 hover:border-emerald-500 dark:hover:border-emerald-400 transition-colors"
+                  ></span>
+                </button>
+                <p
+                  class="text-sm leading-snug font-normal"
+                  :class="
+                    task.is_completed
+                      ? 'text-emerald-800 dark:text-emerald-200'
+                      : 'text-gray-800 dark:text-gray-100'
+                  "
+                >
+                  {{ task.title }}
+                </p>
+              </div>
+
+              <div class="flex flex-wrap gap-1.5 mb-2">
+                <span
+                  v-if="task.dueDate && task.dueDate !== '-'"
+                  class="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded"
+                  :class="dueDateBadgeClass(dueDateStatus(task.dueDate))"
+                >
+                  <svg
+                    class="w-3 h-3"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
                   >
-                    <font-awesome-icon
-                      v-if="task.is_completed"
-                      icon="circle-check"
-                      class="text-emerald-500 text-[15px]"
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
                     />
-                    <span
-                      v-else
-                      class="block w-[15px] h-[15px] rounded-full border-2 border-gray-300 dark:border-gray-500 hover:border-emerald-500 dark:hover:border-emerald-400 transition-colors"
-                    ></span>
-                  </button>
-                  <p
-                    class="text-sm leading-snug font-normal"
-                    :class="
-                      task.is_completed
-                        ? 'text-emerald-800 dark:text-emerald-200'
-                        : 'text-gray-800 dark:text-gray-100'
-                    "
-                  >
-                    {{ task.title }}
-                  </p>
-                </div>
+                  </svg>
+                  {{ formatLogDate(task.dueDate) }}
+                </span>
+                <span
+                  v-if="task.subtasks?.length"
+                  class="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded"
+                  :class="
+                    task.subtasks.filter((s) => s.completed).length ===
+                    task.subtasks.length
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-gray-100 text-gray-500'
+                  "
+                >
+                  ✓ {{ task.subtasks.filter((s) => s.completed).length }}/{{
+                    task.subtasks.length
+                  }}
+                </span>
+                <span
+                  v-if="task.attachments?.length"
+                  class="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-gray-100 text-gray-500"
+                >
+                  📎 {{ task.attachments.length }}
+                </span>
+              </div>
 
-                <div class="flex flex-wrap gap-1.5 mb-2">
+              <div class="flex items-center justify-between mt-1">
+                <div
+                  class="flex items-center gap-1 text-[11px] tabular-nums"
+                  :class="
+                    activeTimerTaskId === task.id
+                      ? 'text-emerald-600 font-medium'
+                      : 'text-gray-400'
+                  "
+                >
                   <span
-                    v-if="task.dueDate && task.dueDate !== '-'"
-                    class="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded"
-                    :class="dueDateBadgeClass(dueDateStatus(task.dueDate))"
-                  >
-                    <svg
-                      class="w-3 h-3"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                      />
-                    </svg>
-                    {{ formatLogDate(task.dueDate) }}
-                  </span>
-                  <span
-                    v-if="task.subtasks?.length"
-                    class="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded"
-                    :class="
-                      task.subtasks.filter((s) => s.completed).length ===
-                      task.subtasks.length
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-gray-100 text-gray-500'
-                    "
-                  >
-                    ✓ {{ task.subtasks.filter((s) => s.completed).length }}/{{
-                      task.subtasks.length
-                    }}
-                  </span>
-                  <span
-                    v-if="task.attachments?.length"
-                    class="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-gray-100 text-gray-500"
-                  >
-                    📎 {{ task.attachments.length }}
-                  </span>
-                </div>
-
-                <div class="flex items-center justify-between mt-1">
-                  <div
-                    class="flex items-center gap-1 text-[11px] tabular-nums"
+                    class="w-1.5 h-1.5 rounded-full"
                     :class="
                       activeTimerTaskId === task.id
-                        ? 'text-emerald-600 font-medium'
-                        : 'text-gray-400'
+                        ? 'bg-emerald-500 animate-pulse'
+                        : 'bg-gray-300'
                     "
+                  ></span>
+                  {{ task.time || "00:00:00" }}
+                  <button
+                    class="ml-1 text-[10px] px-1.5 py-0.5 rounded border transition"
+                    :class="
+                      activeTimerTaskId === task.id
+                        ? 'border-red-200 text-red-500 bg-red-50 hover:bg-red-100'
+                        : 'border-gray-200 text-gray-400 hover:bg-gray-100'
+                    "
+                    @click.stop="handleTimerToggle(task)"
                   >
-                    <span
-                      class="w-1.5 h-1.5 rounded-full"
-                      :class="
-                        activeTimerTaskId === task.id
-                          ? 'bg-emerald-500 animate-pulse'
-                          : 'bg-gray-300'
-                      "
-                    ></span>
-                    {{ task.time || "00:00:00" }}
-                    <button
-                      class="ml-1 text-[10px] px-1.5 py-0.5 rounded border transition"
-                      :class="
-                        activeTimerTaskId === task.id
-                          ? 'border-red-200 text-red-500 bg-red-50 hover:bg-red-100'
-                          : 'border-gray-200 text-gray-400 hover:bg-gray-100'
-                      "
-                      @click.stop="handleTimerToggle(task)"
-                    >
-                      {{ activeTimerTaskId === task.id ? "⏹" : "▶" }}
-                    </button>
-                  </div>
-                  <div class="flex">
-                    <div
-                      v-for="(m, mi) in resolveMembers(task.assignee_ids).slice(
-                        0,
-                        3,
-                      )"
-                      :key="mi"
-                      class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white border-2 border-white"
-                      :class="m.color"
-                      :style="(mi as number) > 0 ? 'margin-left: -6px' : ''"
-                      :title="m.name"
-                    >
-                      {{ m.initial }}
-                    </div>
+                    {{ activeTimerTaskId === task.id ? "⏹" : "▶" }}
+                  </button>
+                </div>
+                <div class="flex">
+                  <div
+                    v-for="(m, mi) in resolveMembers(task.assignee_ids).slice(
+                      0,
+                      3,
+                    )"
+                    :key="mi"
+                    class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white border-2 border-white"
+                    :class="m.color"
+                    :style="(mi as number) > 0 ? 'margin-left: -6px' : ''"
+                    :title="m.name"
+                  >
+                    {{ m.initial }}
                   </div>
                 </div>
               </div>
-            </VueDraggable>
-          </div>
+            </div>
+          </VueDraggable>
 
           <!-- Add Card button -->
           <div v-if="canCreateTask" class="mx-2.5 mb-2.5 mt-1">
