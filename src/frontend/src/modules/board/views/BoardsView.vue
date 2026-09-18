@@ -737,6 +737,7 @@
                     </span>
                     <input
                       type="date"
+                      :min="minDate"
                       :value="dueDateInputValue(selectedTask.dueDate)"
                       @change="handleDueDateChange"
                       class="text-sm text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 px-2.5 py-1.5 rounded-lg transition outline-none"
@@ -1711,6 +1712,14 @@ library.add(
   faFilter,
 );
 
+const minDate = computed(() => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+});
+
 const route = useRoute();
 const router = useRouter();
 const boardId = route.params.boardId as string;
@@ -1754,8 +1763,7 @@ function visibleTaskCount(board: { tasks?: { id: string }[] }) {
     : tasks.length;
 }
 
-async function toggleMyTasksFilter() {
-  if (myTasksFilterLoading.value) return;
+function toggleMyTasksFilter() {
   if (onlyMyTasks.value) {
     onlyMyTasks.value = false;
     myTaskIds.value = new Set();
@@ -1766,15 +1774,19 @@ async function toggleMyTasksFilter() {
     showToast("Data user belum termuat, coba lagi sebentar.");
     return;
   }
-  myTasksFilterLoading.value = true;
-  try {
-    myTaskIds.value = await store.fetchTaskIdsByAssignee(boardId, myId);
-    onlyMyTasks.value = true;
-  } catch (e: any) {
-    showToast(apiErrorMessage(e, "Gagal memuat filter task."));
-  } finally {
-    myTasksFilterLoading.value = false;
+
+  // ✅ Filter lokal dari store tanpa request HTTP ke backend
+  const ids = new Set<string>();
+  const cols = columnsByBoard.value[boardId] ?? [];
+  for (const col of cols) {
+    for (const t of col.tasks ?? []) {
+      if (t.assignee_ids?.includes(myId)) {
+        ids.add(t.id);
+      }
+    }
   }
+  myTaskIds.value = ids;
+  onlyMyTasks.value = true;
 }
 
 // ─── Task State ───────────────────────────────────────────────
@@ -2767,13 +2779,21 @@ function openModal(task: Task) {
 async function loadTaskDetails(task: Task) {
   commentsLoading.value = true;
   try {
-    // 1 Hit API GET /tasks/{id} untuk mengambil SELURUH detail card sekaligus
     const detail = await apiGetTaskDetail(task.id, boardId);
     if (selectedTask.value?.id !== task.id) return;
+
+    // A. Update Description & Due Date dari server
     if (detail?.description !== undefined)
       task.description = detail.description ?? "";
     if (detail?.due_date !== undefined) task.dueDate = detail.due_date ?? "-";
-    // Subtask dari server (termasuk yang completed)
+
+    // B. ✅ TAMBAHKAN INI: Update Status Complete & Member Assignee dari server
+    if (detail?.is_completed !== undefined)
+      task.is_completed = detail.is_completed ?? false;
+    if (detail?.assignee_ids !== undefined)
+      task.assignee_ids = detail.assignee_ids ?? [];
+
+    // C. Update Subtasks dari server (termasuk yang completed)
     if (detail?.subtasks) {
       task.subtasks = detail.subtasks.map((s: any) => ({
         id: s.id,
@@ -2781,7 +2801,8 @@ async function loadTaskDetails(task: Task) {
         completed: s.is_completed ?? s.completed ?? false,
       }));
     }
-    // Komentar dari server
+
+    // D. Update Comments dari server
     const comments = (detail?.comments ?? [])
       .map(
         (c: any): ActivityItem => ({
@@ -2805,9 +2826,11 @@ async function loadTaskDetails(task: Task) {
         (a: ActivityItem, b: ActivityItem) =>
           (b.createdAt ?? 0) - (a.createdAt ?? 0),
       );
+
     const sessionLogs = task.activity.filter((a) => !a.comment);
     task.activity = [...comments, ...sessionLogs];
-    // Attachment dari server
+
+    // E. Update Attachments dari server
     task.attachments = (detail?.attachments ?? []).map((a: any) => ({
       id: a.id,
       title: a.file_name,
