@@ -2413,12 +2413,14 @@ async function loadTimerLogs(taskId: string) {
   }
   timerLogsLoading.value = true;
   timerLogsError.value = "";
+
   try {
-    timerLogs.value = await apiGetTimerLogs(
-      taskId,
-      boardId,
-      currentUser.value.id,
-    );
+    const userId = currentUser.value?.id;
+    if (!userId) {
+      timerLogs.value = [];
+      return;
+    }
+    timerLogs.value = await apiGetTimerLogs(taskId, boardId, userId);
   } catch (e: any) {
     timerLogs.value = [];
     timerLogsError.value = apiErrorMessage(e, "Gagal memuat time log.");
@@ -2876,7 +2878,7 @@ async function loadTaskDetails(task: Task) {
       type: a.type,
       url: a.file_url,
     }));
-    task.attachment_count = task.attachments.length;
+    task.attachment_count = task.attachments?.length ?? 0;
   } catch {
     // Biarkan data lokal jika error
   } finally {
@@ -2965,6 +2967,7 @@ async function handleAddComment() {
   commentLoading.value = true;
   try {
     await apiAddComment(selectedTask.value.id, content, boardId);
+    if (!selectedTask.value.activity) selectedTask.value.activity = [];
     selectedTask.value.activity.unshift({
       author: "You",
       initial: "Y",
@@ -3016,7 +3019,10 @@ async function handleUploadFile(event: Event) {
       type: att.type ?? "image",
       url: att.file_url ?? null,
     });
-    selectedTask.value.attachment_count = selectedTask.value.attachments.length;
+    if (selectedTask.value) {
+      selectedTask.value.attachment_count =
+        selectedTask.value.attachments?.length ?? 0;
+    }
     await refreshActivityAfterAction();
     showToast(`File "${file.name}" uploaded!`);
   } catch (e: any) {
@@ -3044,8 +3050,10 @@ async function handleAddLink() {
       type: att?.type ?? "link",
       url: att?.file_url ?? url,
     });
-    selectedTask.value.attachment_count = selectedTask.value.attachments.length;
-
+    if (selectedTask.value) {
+      selectedTask.value.attachment_count =
+        selectedTask.value.attachments?.length ?? 0;
+    }
     await refreshActivityAfterAction();
     showToast(`Link "${title}" added!`);
     attachLinkTitle.value = "";
@@ -3064,9 +3072,8 @@ async function handleDeleteAttachment(attachId: string | null, index: number) {
     await apiDeleteAttachment(attachId, boardId);
     selectedTask.value?.attachments?.splice(index, 1);
     if (selectedTask.value) {
-      // ✅ Synchronize count
       selectedTask.value.attachment_count =
-        selectedTask.value.attachments.length;
+        selectedTask.value.attachments?.length ?? 0;
     }
     await refreshActivityAfterAction();
     showToast("Attachment deleted.");
