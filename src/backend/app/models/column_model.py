@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import String, Integer, DateTime, func, ForeignKey, UniqueConstraint
+from sqlalchemy import String, Integer, DateTime, func, ForeignKey, UniqueConstraint, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.connections.postgres import Base
@@ -8,7 +8,13 @@ class Column(Base):
     __tablename__ = "columns"
 
     __table_args__ = (
-        UniqueConstraint("board_id", "position", name="uq_column_board_position"),
+        Index(
+            "uq_column_board_position",
+            "board_id",
+            "position",
+            unique=True,
+            postgresql_where="deleted_at IS NULL",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
