@@ -175,7 +175,7 @@
             :empty-insert-threshold="30"
             filter="button, input, a"
             :prevent-on-filter="false"
-            class="overflow-y-auto px-2.5 py-1 flex flex-col gap-2 min-h-[30px]"
+            class="overflow-y-auto max-h-[400px] px-2.5 py-1 flex flex-col gap-2 min-h-[30px]"
             @end="onTaskDragEnd"
           >
             <!-- Teks No tasks tetap ada tapi compact -->
@@ -643,7 +643,9 @@
                 </button>
               </div>
 
+              <!-- BARIS 1: Members & Due date -->
               <div class="flex flex-wrap items-center gap-4">
+                <!-- Members -->
                 <div>
                   <p
                     class="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1.5"
@@ -721,6 +723,7 @@
                   </div>
                 </div>
 
+                <!-- Due date -->
                 <div>
                   <p
                     class="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1.5"
@@ -753,6 +756,39 @@
                     />
                   </div>
                 </div>
+              </div>
+
+              <!-- BARIS 2: Status Button & Dropdown (di bawah Member & Due date) -->
+
+              <!-- Status Action Button (Move to Next Column on Click) -->
+              <div class="mt-4">
+                <p
+                  class="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1.5"
+                >
+                  Status
+                </p>
+                <button
+                  type="button"
+                  @click="handleMoveToNextColumn"
+                  title="Klik untuk pindah ke kolom berikutnya"
+                  class="inline-flex items-center bg-[#0079bf] hover:bg-[#026aa7] dark:bg-blue-600 dark:hover:bg-blue-700 active:scale-[0.98] text-white rounded-md shadow-sm overflow-hidden select-none transition group cursor-pointer"
+                >
+                  <!-- Teks Nama Kolom / Status Saat Ini -->
+                  <span
+                    class="text-xs font-bold uppercase tracking-wider px-3 py-1.5"
+                  >
+                    {{ currentColumnTitle }}
+                  </span>
+
+                  <!-- Garis Pembatas & Icon Panah Kanan -->
+                  <span
+                    class="border-l border-white/25 px-2 py-1.5 flex items-center justify-center group-hover:bg-white/10 transition"
+                  >
+                    <svg class="w-2 h-2.5 fill-current" viewBox="0 0 6 8">
+                      <path d="M0 0l6 4-6 4z" />
+                    </svg>
+                  </span>
+                </button>
               </div>
             </div>
 
@@ -1284,6 +1320,7 @@
               <input
                 type="file"
                 class="hidden"
+                accept="image/jpeg,image/png,image/webp,application/pdf,video/mp4"
                 @change="handleUploadFile"
                 :disabled="attachFileLoading"
               />
@@ -2590,6 +2627,28 @@ async function handleMoveTask(toColumnId: string) {
   }
 }
 
+async function handleMoveToNextColumn() {
+  if (!selectedTask.value) return;
+  const cols = allColumns.value;
+  if (!cols.length) return;
+
+  const currentIndex = cols.findIndex(
+    (c: any) => c.id === selectedTask.value?.column_id,
+  );
+  if (currentIndex === -1) return;
+
+  // Jika sudah di kolom paling kanan / terakhir
+  if (currentIndex >= cols.length - 1) {
+    showToast("Task sudah berada di kolom terakhir.");
+    return;
+  }
+
+  const nextColumn = cols[currentIndex + 1];
+  if (nextColumn) {
+    await handleMoveTask(nextColumn.id);
+  }
+}
+
 async function handleToggleMember(userId: string) {
   if (!selectedTask.value) return;
   const current = selectedTask.value.assignee_ids ?? [];
@@ -3005,10 +3064,47 @@ async function handleDeleteComment(commentId: string, index: number) {
 }
 
 // ─── Attachments ──────────────────────────────────────────────
+// ─── Rules & Helper Validasi Attachment (Cocok 100% dengan Backend) ───
+const ATTACHMENT_ALLOWED_TYPES: Record<
+  string,
+  { type: string; maxSize: number }
+> = {
+  "image/jpeg": { type: "image", maxSize: 10 * 1024 * 1024 }, // 10MB
+  "image/png": { type: "image", maxSize: 10 * 1024 * 1024 }, // 10MB
+  "image/webp": { type: "image", maxSize: 10 * 1024 * 1024 }, // 10MB
+  "application/pdf": { type: "pdf", maxSize: 50 * 1024 * 1024 }, // 50MB
+  "video/mp4": { type: "video", maxSize: 1000 * 1024 * 1024 }, // 1GB
+};
+
+function validateAttachmentFile(file: File): string | null {
+  const config = ATTACHMENT_ALLOWED_TYPES[file.type];
+  if (!config) {
+    return "Tipe file tidak didukung. Hanya menerima JPG, PNG, WEBP, PDF, dan MP4.";
+  }
+  if (file.size > config.maxSize) {
+    if (config.type === "image")
+      return "Ukuran file gambar terlalu besar (Maksimal 10MB).";
+    if (config.type === "pdf")
+      return "Ukuran file PDF terlalu besar (Maksimal 50MB).";
+    if (config.type === "video")
+      return "Ukuran file video terlalu besar (Maksimal 1GB).";
+  }
+  return null;
+}
+
 async function handleUploadFile(event: Event) {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
   if (!file || !selectedTask.value?.id) return;
+
+  // 1. Validasi Client-Side (Tipe & Ukuran File sebelum tembak backend)
+  const validationError = validateAttachmentFile(file);
+  if (validationError) {
+    showToast(validationError);
+    input.value = ""; // Reset input
+    return;
+  }
+
   attachFileLoading.value = true;
   try {
     const att = await apiUploadFile(selectedTask.value.id, file, boardId);
@@ -3016,14 +3112,21 @@ async function handleUploadFile(event: Event) {
     selectedTask.value.attachments.push({
       id: att.id ?? null,
       title: att.file_name ?? file.name,
-      type: att.type ?? "image",
+      type: att.type ?? "file",
       url: att.file_url ?? null,
     });
+
+    // Sinkronkan count di modal dan kartu board view
     if (selectedTask.value) {
       selectedTask.value.attachment_count =
         selectedTask.value.attachments?.length ?? 0;
     }
-    await refreshActivityAfterAction();
+    const storeTask = findTaskById(selectedTask.value.id);
+    if (storeTask) {
+      storeTask.attachment_count = selectedTask.value.attachments.length;
+    }
+
+    refreshActivityAfterAction();
     showToast(`File "${file.name}" uploaded!`);
   } catch (e: any) {
     showToast(apiErrorMessage(e, "Gagal upload file."));
