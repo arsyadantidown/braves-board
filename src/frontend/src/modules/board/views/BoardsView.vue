@@ -163,6 +163,7 @@
 
           <!-- Task Cards (Auto height menyesuaikan isi) -->
           <VueDraggable
+            item-key="id"
             v-model="board.tasks"
             :group="{ name: 'tasks', pull: true, put: true }"
             :data-column-id="board.id"
@@ -175,7 +176,7 @@
             :empty-insert-threshold="30"
             filter="button, input, a"
             :prevent-on-filter="false"
-            class="overflow-y-auto max-h-[400px] px-2.5 py-1 flex flex-col gap-2 min-h-[30px]"
+            class="overflow-y-auto max-h-[400px] px-2.5 py-1 flex flex-col gap-2 min-h-[30px] select-none"
             @end="onTaskDragEnd"
           >
             <!-- Teks No tasks tetap ada tapi compact -->
@@ -196,7 +197,7 @@
               v-show="isTaskVisible(task)"
               :key="task.id"
               :data-id="task.id"
-              class="task-card rounded-lg border p-3 cursor-grab active:cursor-grabbing hover:border-blue-400 hover:shadow-md transition-all group"
+              class="task-card select-none rounded-lg border p-3 cursor-grab active:cursor-grabbing hover:border-blue-400 hover:shadow-md transition-all group"
               :class="
                 task.is_completed
                   ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-600/50'
@@ -2279,10 +2280,14 @@ async function onTaskDragEnd(event: any) {
     }
 
     if (selectedTask.value?.id === taskId) {
-      await refreshActivityAfterAction();
+      refreshActivityAfterAction();
     }
   } catch (e: any) {
     showToast(apiErrorMessage(e, "Gagal memindahkan task."));
+    // Jika gagal (misal kena 429), pulihkan state board agar posisi kartu tidak rusak/nyangkut
+    try {
+      await store.fetchColumns(boardId, true);
+    } catch {}
   }
 }
 
@@ -3214,17 +3219,33 @@ async function handleAddLink() {
 
 async function handleDeleteAttachment(attachId: string | null, index: number) {
   if (!attachId) return;
+
+  // 1. Alert peringatan konfirmasi sebelum hapus
+  const confirmed = window.confirm(
+    "Apakah anda yakin menghapus attachment ini?",
+  );
+  if (!confirmed) return;
+
   try {
     await apiDeleteAttachment(attachId, boardId);
     selectedTask.value?.attachments?.splice(index, 1);
+
+    // Sinkronkan count di modal dan kartu board view
     if (selectedTask.value) {
       selectedTask.value.attachment_count =
         selectedTask.value.attachments?.length ?? 0;
     }
+    if (selectedTask.value?.id) {
+      const storeTask = findTaskById(selectedTask.value.id);
+      if (storeTask && selectedTask.value.attachments) {
+        storeTask.attachment_count = selectedTask.value.attachments.length;
+      }
+    }
+
     await refreshActivityAfterAction();
     showToast("Attachment deleted.");
   } catch (e: any) {
-    showToast(apiErrorMessage(e, "Gagal menghapus komentar."));
+    showToast(apiErrorMessage(e, "Gagal menghapus attachment."));
   }
 }
 
