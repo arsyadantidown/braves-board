@@ -533,6 +533,7 @@ async function handleStopActiveTimer() {
     localStorage.removeItem("active_timer_task_title");
     localStorage.removeItem("active_timer_board_id");
     localStorage.removeItem("active_timer_started_at");
+    localStorage.removeItem("active_timer_last_confirmed_at");
     activeTaskId.value = null;
     activeTaskTitle.value = null;
     activeBoardId.value = null;

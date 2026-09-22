@@ -1893,7 +1893,7 @@ const timerLogsLoading = ref(false);
 const timerLogsError = ref("");
 const timerDescription = ref("");
 let tickInterval: ReturnType<typeof setInterval> | null = null;
-let pingInterval: ReturnType<typeof setInterval> | null = null;
+
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
 let originalTaskSnapshot: { title: string; description: string } | null = null;
 
@@ -2190,22 +2190,6 @@ function stopTick() {
   }
 }
 
-function startPing(taskId: string) {
-  if (pingInterval) clearInterval(pingInterval);
-  pingInterval = setInterval(async () => {
-    try {
-      await apiPingTimer(taskId, boardId);
-    } catch {}
-  }, 120000);
-}
-
-function stopPing() {
-  if (pingInterval) {
-    clearInterval(pingInterval);
-    pingInterval = null;
-  }
-}
-
 function restoreActiveTimer() {
   const storedTaskId = localStorage.getItem("active_timer_task_id");
   const storedBoardId = localStorage.getItem("active_timer_board_id");
@@ -2224,7 +2208,7 @@ function restoreActiveTimer() {
       task.time = formatTimer(elapsedSeconds);
     }
     startTick(storedTaskId);
-    startPing(storedTaskId);
+
     return;
   }
   // 2. Fallback: Cek dari data kolom/task yang di-fetch dari backend
@@ -2240,7 +2224,7 @@ function restoreActiveTimer() {
       localStorage.setItem("active_timer_board_id", boardId);
       localStorage.setItem("active_timer_started_at", String(Date.now()));
       startTick(runningTask.id);
-      startPing(runningTask.id);
+
       break;
     }
   }
@@ -2444,7 +2428,7 @@ async function handleTimerToggle(task: Task) {
       localStorage.setItem("active_timer_started_at", String(Date.now()));
       timerDescription.value = "";
       startTick(task.id);
-      startPing(task.id);
+
       showToast("Timer started ▶");
     } catch (e: any) {
       showToast(apiErrorMessage(e, "Gagal memulai timer."));
@@ -2456,7 +2440,7 @@ async function doStopTimer(taskId: string) {
   try {
     await apiStopTimer(taskId, boardId);
     stopTick();
-    stopPing();
+
     const elapsed = timerSeconds.value[taskId] || 0;
     activeTimerTaskId.value = null;
     localStorage.removeItem("active_timer_task_id");
@@ -2591,7 +2575,6 @@ onMounted(() => {
 });
 onUnmounted(() => {
   stopTick();
-  stopPing();
 });
 // ─── Task Actions ─────────────────────────────────────
 function handleDeleteTask() {
