@@ -755,10 +755,20 @@ function entryDurationSeconds(entry: TimeEntry): number {
     return 0;
   }
 
-  return Math.max(
-    0,
-    Math.floor((nowTick.value - new Date(entry.startTime).getTime()) / 1000),
-  );
+  // Normalisasi format ISO UTC
+  let startTimeStr = entry.startTime;
+  if (
+    typeof startTimeStr === "string" &&
+    !startTimeStr.endsWith("Z") &&
+    !startTimeStr.includes("+")
+  ) {
+    startTimeStr += "Z";
+  }
+
+  const startedAtMs = new Date(startTimeStr).getTime();
+  if (Number.isNaN(startedAtMs)) return 0;
+
+  return Math.max(0, Math.floor((nowTick.value - startedAtMs) / 1000));
 }
 
 const filteredTotalSeconds = computed(() =>
@@ -772,26 +782,55 @@ onMounted(async () => {
   nowTickTimer = setInterval(() => {
     nowTick.value = Date.now();
   }, 1000);
-  if (!currentUser.value) await fetchCurrentUser();
 
-  if (activeTaskId.value && activeBoardId.value) {
-    try {
-      const logs = await getTimerLogs(
-        activeTaskId.value,
-        activeBoardId.value,
-        currentUser.value.id,
-      );
-      const running = logs.find((l) => !l.stop_time);
-      const startedAt = running?.start_time
-        ? new Date(running.start_time).getTime()
-        : Date.now();
-      startTick(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
-    } catch {
-      startTick(0);
-    }
+  // 1. ✅ Langsung hidupkan timer dari localStorage secara instan tanpa menunggu API
+  const storedTaskId = localStorage.getItem("active_timer_task_id");
+  const storedStartedAt = localStorage.getItem("active_timer_started_at");
+  if (storedTaskId) {
+    const startedAtMs = Number(storedStartedAt) || Date.now();
+    const initialElapsed = Math.max(
+      0,
+      Math.floor((Date.now() - startedAtMs) / 1000),
+    );
+    startTick(initialElapsed);
   }
 
+  if (!currentUser.value) await fetchCurrentUser();
   await loadEntries();
+
+  // 2. ✅ Sinkronkan dengan data running log dari server jika ada
+  const runningEntry = allEntries.value.find((e) => !e.stopTime);
+  if (runningEntry) {
+    activeTaskId.value = runningEntry.taskId;
+    activeTaskTitle.value = runningEntry.taskTitle;
+    activeBoardId.value = runningEntry.boardId;
+
+    let startTimeStr = runningEntry.startTime;
+    if (
+      startTimeStr &&
+      typeof startTimeStr === "string" &&
+      !startTimeStr.endsWith("Z") &&
+      !startTimeStr.includes("+")
+    ) {
+      startTimeStr += "Z";
+    }
+    const startedAtMs = startTimeStr
+      ? new Date(startTimeStr).getTime()
+      : Date.now();
+    const runningElapsed = Math.max(
+      0,
+      Math.floor((Date.now() - startedAtMs) / 1000),
+    );
+
+    localStorage.setItem("active_timer_task_id", runningEntry.taskId);
+    localStorage.setItem("active_timer_task_title", runningEntry.taskTitle);
+    localStorage.setItem("active_timer_board_id", runningEntry.boardId);
+    localStorage.setItem("active_timer_started_at", String(startedAtMs));
+    startTick(runningElapsed);
+  } else if (!storedTaskId) {
+    stopTick();
+    elapsed.value = 0;
+  }
 });
 
 onUnmounted(() => {

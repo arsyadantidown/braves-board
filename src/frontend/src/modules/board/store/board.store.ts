@@ -174,10 +174,25 @@ export const useAppStore = defineStore(
       }
       if (columnsByBoard.value[boardId] && !force) return;
       try {
-        // 🚀 Cukup 1 Hit API GET /boards/{boardId} untuk mengambil seluruh kolom & task sekaligus
+        // Cukup 1 Hit API GET /boards/{boardId} untuk mengambil seluruh kolom & task sekaligus
         const detail = await getBoardDetail(boardId);
         const boardData = detail?.board ?? detail ?? {};
         const cols = boardData.columns ?? [];
+
+        //Simpan / update data board (judul dsb) ke store agar header BoardsView langsung terisi
+        if (boardData.id && boardData.title) {
+          const existingIdx = boards.value.findIndex(
+            (b: any) => b.id === boardData.id,
+          );
+          if (existingIdx !== -1) {
+            boards.value[existingIdx] = {
+              ...boards.value[existingIdx],
+              ...boardData,
+            };
+          } else {
+            boards.value.push(boardData);
+          }
+        }
 
         columnsByBoard.value[boardId] = cols.map((col: any) => ({
           id: col.id,

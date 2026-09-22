@@ -2204,6 +2204,47 @@ function stopPing() {
     pingInterval = null;
   }
 }
+
+function restoreActiveTimer() {
+  const storedTaskId = localStorage.getItem("active_timer_task_id");
+  const storedBoardId = localStorage.getItem("active_timer_board_id");
+  const storedStartedAt = localStorage.getItem("active_timer_started_at");
+  // 1. Cek dari localStorage jika board sesuai
+  if (storedTaskId && storedBoardId === boardId) {
+    activeTimerTaskId.value = storedTaskId;
+    const startedAtMs = Number(storedStartedAt) || Date.now();
+    const elapsedSeconds = Math.max(
+      0,
+      Math.floor((Date.now() - startedAtMs) / 1000),
+    );
+    timerSeconds.value[storedTaskId] = elapsedSeconds;
+    const task = findTaskById(storedTaskId);
+    if (task) {
+      task.time = formatTimer(elapsedSeconds);
+    }
+    startTick(storedTaskId);
+    startPing(storedTaskId);
+    return;
+  }
+  // 2. Fallback: Cek dari data kolom/task yang di-fetch dari backend
+  for (const col of boards.value) {
+    const runningTask = (col.tasks ?? []).find((t: any) => t.is_timer_running);
+    if (runningTask) {
+      activeTimerTaskId.value = runningTask.id;
+      if (!timerSeconds.value[runningTask.id]) {
+        timerSeconds.value[runningTask.id] = 0;
+      }
+      localStorage.setItem("active_timer_task_id", runningTask.id);
+      localStorage.setItem("active_timer_task_title", runningTask.title ?? "");
+      localStorage.setItem("active_timer_board_id", boardId);
+      localStorage.setItem("active_timer_started_at", String(Date.now()));
+      startTick(runningTask.id);
+      startPing(runningTask.id);
+      break;
+    }
+  }
+}
+
 async function onTaskDragEnd(event: any) {
   const taskId = event.item?.dataset?.id;
   const toColumnId = event.to?.dataset?.columnId;
@@ -2419,12 +2460,13 @@ async function doStopTimer(taskId: string) {
     localStorage.removeItem("active_timer_started_at");
     showToast(`Timer stopped ⏹ — ${formatTimer(elapsed)}`);
 
-    // ✅ LANGSUNG UBAH TAMPILAN KE TOTAL AKUMULASI WAKTU
+    //  LANGSUNG UBAH TAMPILAN KE TOTAL AKUMULASI WAKTU
     const task = findTaskById(taskId);
     if (task) {
+      task.is_timer_running = false; //Pastikan status running kartu di-set false
       // 1. Akumulasikan total detik pengerjaan
       task.total_duration = (task.total_duration ?? 0) + elapsed;
-      // 2. Langsung set tampilan kartu ke waktu total akumulasi (misal 10s lama + 4s baru = 14s)
+      // 2. Langsung set tampilan kartu ke waktu total akumulasi
       task.time = formatTimer(task.total_duration);
     }
 
@@ -2496,6 +2538,7 @@ async function initBoards() {
     // halaman daftar/dashboard yang memuat SEMUA board. Jadi board yang sedang
     // dibuka selalu fresh, tanpa memicu 429.
     await store.fetchColumns(boardId, true);
+    restoreActiveTimer();
     openTaskFromQuery();
   } catch (e: any) {
     console.error(
@@ -2536,7 +2579,7 @@ async function handleCreateBoard() {
 
 onMounted(() => {
   initBoards();
-  store.fetchBoards();
+
   store.fetchUsers();
   store.fetchBoardMembers(boardId).catch(() => {});
   if (!currentUser.value) fetchCurrentUser();
