@@ -132,11 +132,13 @@ const open = ref(false);
 function toggleOpen() {
   const next = !open.value;
   open.value = next;
+  store.isDropdownOpen = next; // Sinkronkan dengan store
   if (next) store.fetchNotifications();
 }
 
 function closeOnOutsideClick() {
   open.value = false;
+  store.isDropdownOpen = false; // Reset saat tertutup
 }
 
 onMounted(() => {
