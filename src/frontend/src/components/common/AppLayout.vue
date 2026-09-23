@@ -112,9 +112,66 @@
       </main>
     </div>
   </div>
+  <!-- MODAL CONFIRM ACTIVE (MENIT KE-175) -->
+  <Teleport to="body">
+    <div
+      v-if="showConfirmModal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
+    >
+      <div
+        class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 border border-gray-100 dark:border-gray-700 animate-in fade-in zoom-in duration-200"
+      >
+        <div class="flex items-center gap-3 mb-4 text-amber-500">
+          <span class="text-2xl">⏳</span>
+          <h3 class="text-base font-bold text-gray-800 dark:text-gray-100">
+            Konfirmasi Aktivitas Kerja
+          </h3>
+        </div>
+
+        <p class="text-sm text-gray-600 dark:text-gray-300 mb-2">
+          Anda telah bekerja selama
+          <strong class="text-blue-600">2 jam 55 menit</strong> pada task:
+        </p>
+
+        <div
+          class="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl mb-4 border border-gray-200 dark:border-gray-600 text-sm font-semibold text-gray-800 dark:text-gray-100 truncate"
+        >
+          {{ activeTaskTitle }}
+        </div>
+
+        <p
+          class="text-xs text-amber-600 dark:text-amber-400 mb-6 flex items-center gap-1.5"
+        >
+          <span>⚠️</span> Timer tetap berjalan. Otomatis berhenti dalam
+          <strong
+            >{{ Math.floor(countdownSeconds / 60) }}m
+            {{ countdownSeconds % 60 }}s</strong
+          >
+          jika tidak dikonfirmasi.
+        </p>
+
+        <div class="flex items-center justify-end gap-3">
+          <button
+            @click="handleStopFromModal"
+            class="px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition"
+          >
+            Hentikan Timer
+          </button>
+          <button
+            @click="handleConfirmActive"
+            :disabled="confirmLoading"
+            class="px-5 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md transition disabled:opacity-50"
+          >
+            {{ confirmLoading ? "Menyimpan..." : "Ya, Lanjutkan Bekerja" }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
+import { useGlobalTimer } from "../../composables/useGlobalTimer";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { library } from "@fortawesome/fontawesome-svg-core";
 import {
@@ -139,9 +196,20 @@ const { user, fetchCurrentUser } = useAuth();
 const showProfile = ref(false);
 const imgError = ref(false);
 
+const {
+  showConfirmModal,
+  activeTaskTitle,
+  countdownSeconds,
+  confirmLoading,
+  handleConfirmActive,
+  handleStopFromModal,
+  initGlobalHeartbeat,
+} = useGlobalTimer();
+
 onMounted(() => {
   if (!user.value) {
     fetchCurrentUser();
   }
+  initGlobalHeartbeat();
 });
 </script>

@@ -1,5 +1,5 @@
-import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { defineStore } from "pinia";
+import { ref } from "vue";
 import {
   getNotifications,
   getUnreadCount,
@@ -7,71 +7,121 @@ import {
   markAllNotificationsRead,
   deleteNotification,
   type AppNotification,
-} from '../api/notification.api'
+} from "../api/notification.api";
 
-const POLL_INTERVAL_MS = 30000
+// Polling interval cerdas: 12 detik (hanya 5 request per menit)
+const POLL_INTERVAL_MS = 12000;
 
-export const useNotificationStore = defineStore('notification', () => {
-  const notifications = ref<AppNotification[]>([])
-  const unreadCount = ref(0)
-  const loading = ref(false)
-  let pollInterval: ReturnType<typeof setInterval> | null = null
+export const useNotificationStore = defineStore("notification", () => {
+  const notifications = ref<AppNotification[]>([]);
+  const unreadCount = ref(0);
+  const loading = ref(false);
+  const isDropdownOpen = ref(false);
 
-  async function fetchNotifications() {
-    loading.value = true
+  let pollInterval: ReturnType<typeof setInterval> | null = null;
+  let isListenerAttached = false;
+
+  async function fetchNotifications(silent = false) {
+    if (!silent) loading.value = true;
     try {
-      notifications.value = await getNotifications()
+      notifications.value = await getNotifications();
     } finally {
-      loading.value = false
+      if (!silent) loading.value = false;
     }
   }
 
   async function refreshUnreadCount() {
-    unreadCount.value = await getUnreadCount()
+    try {
+      unreadCount.value = await getUnreadCount();
+    } catch {
+      // Abaikan error jaringan sementara
+    }
   }
 
   async function markAsRead(notificationId: string) {
-    await markNotificationRead(notificationId)
-    const n = notifications.value.find(x => x.id === notificationId)
+    await markNotificationRead(notificationId);
+    const n = notifications.value.find((x) => x.id === notificationId);
     if (n && !n.is_read) {
-      n.is_read = true
-      unreadCount.value = Math.max(0, unreadCount.value - 1)
+      n.is_read = true;
+      unreadCount.value = Math.max(0, unreadCount.value - 1);
     }
   }
 
   async function markAllAsRead() {
-    await markAllNotificationsRead()
-    notifications.value.forEach(n => { n.is_read = true })
-    unreadCount.value = 0
+    await markAllNotificationsRead();
+    notifications.value.forEach((n) => {
+      n.is_read = true;
+    });
+    unreadCount.value = 0;
   }
 
   async function removeNotification(notificationId: string) {
-    await deleteNotification(notificationId)
-    const n = notifications.value.find(x => x.id === notificationId)
-    notifications.value = notifications.value.filter(x => x.id !== notificationId)
-    if (n && !n.is_read) unreadCount.value = Math.max(0, unreadCount.value - 1)
+    await deleteNotification(notificationId);
+    const n = notifications.value.find((x) => x.id === notificationId);
+    notifications.value = notifications.value.filter(
+      (x) => x.id !== notificationId,
+    );
+    if (n && !n.is_read) unreadCount.value = Math.max(0, unreadCount.value - 1);
   }
 
-  // Idempotent — AppLayout (dan bel notifikasi di dalamnya) di-mount ulang
-  // tiap kali pindah halaman (tiap view bungkus <AppLayout> sendiri-sendiri,
-  // bukan layout persisten via router-view), jadi startPolling() bisa
-  // dipanggil berkali-kali. Guard di sini supaya interval tidak dobel.
+  function handleVisibilityOrFocus() {
+    if (
+      typeof document !== "undefined" &&
+      document.visibilityState === "visible"
+    ) {
+      refreshUnreadCount();
+      if (isDropdownOpen.value) {
+        fetchNotifications(true);
+      }
+    }
+  }
+
   function startPolling() {
-    if (pollInterval) return
-    refreshUnreadCount().catch(() => { })
-    pollInterval = setInterval(() => {
-      refreshUnreadCount().catch(() => { })
-    }, POLL_INTERVAL_MS)
+    // 1. Fetch awal langsung saat app/komponen mount
+    refreshUnreadCount();
+
+    // 2. Jalankan interval hanya jika belum berjalan
+    if (!pollInterval) {
+      pollInterval = setInterval(() => {
+        // Hanya tembak polling jika tab browser sedang dibuka/dilihat user
+        if (
+          typeof document !== "undefined" &&
+          document.visibilityState === "visible"
+        ) {
+          refreshUnreadCount();
+          if (isDropdownOpen.value) {
+            fetchNotifications(true);
+          }
+        }
+      }, POLL_INTERVAL_MS);
+    }
+
+    // 3. Pasang listener focus/tab switch (hanya 1x)
+    if (!isListenerAttached && typeof window !== "undefined") {
+      window.addEventListener("focus", handleVisibilityOrFocus);
+      document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+      isListenerAttached = true;
+    }
   }
 
   function stopPolling() {
-    if (pollInterval) { clearInterval(pollInterval); pollInterval = null }
+    if (pollInterval) {
+      clearInterval(pollInterval);
+      pollInterval = null;
+    }
   }
 
   return {
-    notifications, unreadCount, loading,
-    fetchNotifications, refreshUnreadCount,
-    markAsRead, markAllAsRead, removeNotification,
-    startPolling, stopPolling,
-  }
-})
+    notifications,
+    unreadCount,
+    loading,
+    isDropdownOpen,
+    fetchNotifications,
+    refreshUnreadCount,
+    markAsRead,
+    markAllAsRead,
+    removeNotification,
+    startPolling,
+    stopPolling,
+  };
+});

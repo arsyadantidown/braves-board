@@ -163,6 +163,7 @@
 
           <!-- Task Cards (Auto height menyesuaikan isi) -->
           <VueDraggable
+            item-key="id"
             v-model="board.tasks"
             :group="{ name: 'tasks', pull: true, put: true }"
             :data-column-id="board.id"
@@ -175,7 +176,7 @@
             :empty-insert-threshold="30"
             filter="button, input, a"
             :prevent-on-filter="false"
-            class="overflow-y-auto px-2.5 py-1 flex flex-col gap-2 min-h-[30px]"
+            class="overflow-y-auto max-h-[400px] px-2.5 py-1 flex flex-col gap-2 min-h-[30px] select-none"
             @end="onTaskDragEnd"
           >
             <!-- Teks No tasks tetap ada tapi compact -->
@@ -196,7 +197,7 @@
               v-show="isTaskVisible(task)"
               :key="task.id"
               :data-id="task.id"
-              class="task-card rounded-lg border p-3 cursor-grab active:cursor-grabbing hover:border-blue-400 hover:shadow-md transition-all group"
+              class="task-card select-none rounded-lg border p-3 cursor-grab active:cursor-grabbing hover:border-blue-400 hover:shadow-md transition-all group"
               :class="
                 task.is_completed
                   ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-600/50'
@@ -289,11 +290,15 @@
                     task.subtasks.length
                   }}
                 </span>
+                <!-- ATTACHMENT BADGE -->
                 <span
-                  v-if="task.attachments?.length"
+                  v-if="
+                    (task.attachment_count ?? 0) > 0 || task.attachments?.length
+                  "
                   class="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded bg-gray-100 text-gray-500"
                 >
-                  📎 {{ task.attachments.length }}
+                  📎
+                  {{ task.attachment_count ?? task.attachments?.length ?? 0 }}
                 </span>
               </div>
 
@@ -639,7 +644,9 @@
                 </button>
               </div>
 
+              <!-- BARIS 1: Members & Due date -->
               <div class="flex flex-wrap items-center gap-4">
+                <!-- Members -->
                 <div>
                   <p
                     class="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1.5"
@@ -717,6 +724,7 @@
                   </div>
                 </div>
 
+                <!-- Due date -->
                 <div>
                   <p
                     class="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1.5"
@@ -749,6 +757,39 @@
                     />
                   </div>
                 </div>
+              </div>
+
+              <!-- BARIS 2: Status Button & Dropdown (di bawah Member & Due date) -->
+
+              <!-- Status Action Button (Move to Next Column on Click) -->
+              <div class="mt-4">
+                <p
+                  class="text-xs text-gray-500 dark:text-gray-400 font-medium mb-1.5"
+                >
+                  Status
+                </p>
+                <button
+                  type="button"
+                  @click="handleMoveToNextColumn"
+                  title="Klik untuk pindah ke kolom berikutnya"
+                  class="inline-flex items-center bg-[#0079bf] hover:bg-[#026aa7] dark:bg-blue-600 dark:hover:bg-blue-700 active:scale-[0.98] text-white rounded-md shadow-sm overflow-hidden select-none transition group cursor-pointer"
+                >
+                  <!-- Teks Nama Kolom / Status Saat Ini -->
+                  <span
+                    class="text-xs font-bold uppercase tracking-wider px-3 py-1.5"
+                  >
+                    {{ currentColumnTitle }}
+                  </span>
+
+                  <!-- Garis Pembatas & Icon Panah Kanan -->
+                  <span
+                    class="border-l border-white/25 px-2 py-1.5 flex items-center justify-center group-hover:bg-white/10 transition"
+                  >
+                    <svg class="w-2 h-2.5 fill-current" viewBox="0 0 6 8">
+                      <path d="M0 0l6 4-6 4z" />
+                    </svg>
+                  </span>
+                </button>
               </div>
             </div>
 
@@ -1280,6 +1321,7 @@
               <input
                 type="file"
                 class="hidden"
+                accept="image/jpeg,image/png,image/webp,application/pdf,video/mp4"
                 @change="handleUploadFile"
                 :disabled="attachFileLoading"
               />
@@ -1688,6 +1730,7 @@ interface Task {
     type: string;
     url: string | null;
   }[];
+  attachment_count?: number;
   time?: string;
   dueDate?: string;
   label?: string;
@@ -1850,7 +1893,7 @@ const timerLogsLoading = ref(false);
 const timerLogsError = ref("");
 const timerDescription = ref("");
 let tickInterval: ReturnType<typeof setInterval> | null = null;
-let pingInterval: ReturnType<typeof setInterval> | null = null;
+
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
 let originalTaskSnapshot: { title: string; description: string } | null = null;
 
@@ -2147,21 +2190,46 @@ function stopTick() {
   }
 }
 
-function startPing(taskId: string) {
-  if (pingInterval) clearInterval(pingInterval);
-  pingInterval = setInterval(async () => {
-    try {
-      await apiPingTimer(taskId, boardId);
-    } catch {}
-  }, 120000);
-}
+function restoreActiveTimer() {
+  const storedTaskId = localStorage.getItem("active_timer_task_id");
+  const storedBoardId = localStorage.getItem("active_timer_board_id");
+  const storedStartedAt = localStorage.getItem("active_timer_started_at");
+  // 1. Cek dari localStorage jika board sesuai
+  if (storedTaskId && storedBoardId === boardId) {
+    activeTimerTaskId.value = storedTaskId;
+    const startedAtMs = Number(storedStartedAt) || Date.now();
+    const elapsedSeconds = Math.max(
+      0,
+      Math.floor((Date.now() - startedAtMs) / 1000),
+    );
+    timerSeconds.value[storedTaskId] = elapsedSeconds;
+    const task = findTaskById(storedTaskId);
+    if (task) {
+      task.time = formatTimer(elapsedSeconds);
+    }
+    startTick(storedTaskId);
 
-function stopPing() {
-  if (pingInterval) {
-    clearInterval(pingInterval);
-    pingInterval = null;
+    return;
+  }
+  // 2. Fallback: Cek dari data kolom/task yang di-fetch dari backend
+  for (const col of boards.value) {
+    const runningTask = (col.tasks ?? []).find((t: any) => t.is_timer_running);
+    if (runningTask) {
+      activeTimerTaskId.value = runningTask.id;
+      if (!timerSeconds.value[runningTask.id]) {
+        timerSeconds.value[runningTask.id] = 0;
+      }
+      localStorage.setItem("active_timer_task_id", runningTask.id);
+      localStorage.setItem("active_timer_task_title", runningTask.title ?? "");
+      localStorage.setItem("active_timer_board_id", boardId);
+      localStorage.setItem("active_timer_started_at", String(Date.now()));
+      startTick(runningTask.id);
+
+      break;
+    }
   }
 }
+
 async function onTaskDragEnd(event: any) {
   const taskId = event.item?.dataset?.id;
   const toColumnId = event.to?.dataset?.columnId;
@@ -2196,10 +2264,14 @@ async function onTaskDragEnd(event: any) {
     }
 
     if (selectedTask.value?.id === taskId) {
-      await refreshActivityAfterAction();
+      refreshActivityAfterAction();
     }
   } catch (e: any) {
     showToast(apiErrorMessage(e, "Gagal memindahkan task."));
+    // Jika gagal (misal kena 429), pulihkan state board agar posisi kartu tidak rusak/nyangkut
+    try {
+      await store.fetchColumns(boardId, true);
+    } catch {}
   }
 }
 
@@ -2356,7 +2428,7 @@ async function handleTimerToggle(task: Task) {
       localStorage.setItem("active_timer_started_at", String(Date.now()));
       timerDescription.value = "";
       startTick(task.id);
-      startPing(task.id);
+
       showToast("Timer started ▶");
     } catch (e: any) {
       showToast(apiErrorMessage(e, "Gagal memulai timer."));
@@ -2368,7 +2440,7 @@ async function doStopTimer(taskId: string) {
   try {
     await apiStopTimer(taskId, boardId);
     stopTick();
-    stopPing();
+
     const elapsed = timerSeconds.value[taskId] || 0;
     activeTimerTaskId.value = null;
     localStorage.removeItem("active_timer_task_id");
@@ -2377,12 +2449,13 @@ async function doStopTimer(taskId: string) {
     localStorage.removeItem("active_timer_started_at");
     showToast(`Timer stopped ⏹ — ${formatTimer(elapsed)}`);
 
-    // ✅ LANGSUNG UBAH TAMPILAN KE TOTAL AKUMULASI WAKTU
+    //  LANGSUNG UBAH TAMPILAN KE TOTAL AKUMULASI WAKTU
     const task = findTaskById(taskId);
     if (task) {
+      task.is_timer_running = false; //Pastikan status running kartu di-set false
       // 1. Akumulasikan total detik pengerjaan
       task.total_duration = (task.total_duration ?? 0) + elapsed;
-      // 2. Langsung set tampilan kartu ke waktu total akumulasi (misal 10s lama + 4s baru = 14s)
+      // 2. Langsung set tampilan kartu ke waktu total akumulasi
       task.time = formatTimer(task.total_duration);
     }
 
@@ -2408,12 +2481,14 @@ async function loadTimerLogs(taskId: string) {
   }
   timerLogsLoading.value = true;
   timerLogsError.value = "";
+
   try {
-    timerLogs.value = await apiGetTimerLogs(
-      taskId,
-      boardId,
-      currentUser.value.id,
-    );
+    const userId = currentUser.value?.id;
+    if (!userId) {
+      timerLogs.value = [];
+      return;
+    }
+    timerLogs.value = await apiGetTimerLogs(taskId, boardId, userId);
   } catch (e: any) {
     timerLogs.value = [];
     timerLogsError.value = apiErrorMessage(e, "Gagal memuat time log.");
@@ -2452,6 +2527,7 @@ async function initBoards() {
     // halaman daftar/dashboard yang memuat SEMUA board. Jadi board yang sedang
     // dibuka selalu fresh, tanpa memicu 429.
     await store.fetchColumns(boardId, true);
+    restoreActiveTimer();
     openTaskFromQuery();
   } catch (e: any) {
     console.error(
@@ -2492,14 +2568,13 @@ async function handleCreateBoard() {
 
 onMounted(() => {
   initBoards();
-  store.fetchBoards();
+
   store.fetchUsers();
   store.fetchBoardMembers(boardId).catch(() => {});
   if (!currentUser.value) fetchCurrentUser();
 });
 onUnmounted(() => {
   stopTick();
-  stopPing();
 });
 // ─── Task Actions ─────────────────────────────────────
 function handleDeleteTask() {
@@ -2580,6 +2655,28 @@ async function handleMoveTask(toColumnId: string) {
     showToast("Task moved.");
   } catch (e: any) {
     showToast(apiErrorMessage(e, "Gagal memindahkan task."));
+  }
+}
+
+async function handleMoveToNextColumn() {
+  if (!selectedTask.value) return;
+  const cols = allColumns.value;
+  if (!cols.length) return;
+
+  const currentIndex = cols.findIndex(
+    (c: any) => c.id === selectedTask.value?.column_id,
+  );
+  if (currentIndex === -1) return;
+
+  // Jika sudah di kolom paling kanan / terakhir
+  if (currentIndex >= cols.length - 1) {
+    showToast("Task sudah berada di kolom terakhir.");
+    return;
+  }
+
+  const nextColumn = cols[currentIndex + 1];
+  if (nextColumn) {
+    await handleMoveTask(nextColumn.id);
   }
 }
 
@@ -2871,6 +2968,7 @@ async function loadTaskDetails(task: Task) {
       type: a.type,
       url: a.file_url,
     }));
+    task.attachment_count = task.attachments?.length ?? 0;
   } catch {
     // Biarkan data lokal jika error
   } finally {
@@ -2959,6 +3057,7 @@ async function handleAddComment() {
   commentLoading.value = true;
   try {
     await apiAddComment(selectedTask.value.id, content, boardId);
+    if (!selectedTask.value.activity) selectedTask.value.activity = [];
     selectedTask.value.activity.unshift({
       author: "You",
       initial: "Y",
@@ -2996,10 +3095,47 @@ async function handleDeleteComment(commentId: string, index: number) {
 }
 
 // ─── Attachments ──────────────────────────────────────────────
+// ─── Rules & Helper Validasi Attachment (Cocok 100% dengan Backend) ───
+const ATTACHMENT_ALLOWED_TYPES: Record<
+  string,
+  { type: string; maxSize: number }
+> = {
+  "image/jpeg": { type: "image", maxSize: 10 * 1024 * 1024 }, // 10MB
+  "image/png": { type: "image", maxSize: 10 * 1024 * 1024 }, // 10MB
+  "image/webp": { type: "image", maxSize: 10 * 1024 * 1024 }, // 10MB
+  "application/pdf": { type: "pdf", maxSize: 50 * 1024 * 1024 }, // 50MB
+  "video/mp4": { type: "video", maxSize: 1000 * 1024 * 1024 }, // 1GB
+};
+
+function validateAttachmentFile(file: File): string | null {
+  const config = ATTACHMENT_ALLOWED_TYPES[file.type];
+  if (!config) {
+    return "Tipe file tidak didukung. Hanya menerima JPG, PNG, WEBP, PDF, dan MP4.";
+  }
+  if (file.size > config.maxSize) {
+    if (config.type === "image")
+      return "Ukuran file gambar terlalu besar (Maksimal 10MB).";
+    if (config.type === "pdf")
+      return "Ukuran file PDF terlalu besar (Maksimal 50MB).";
+    if (config.type === "video")
+      return "Ukuran file video terlalu besar (Maksimal 1GB).";
+  }
+  return null;
+}
+
 async function handleUploadFile(event: Event) {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
   if (!file || !selectedTask.value?.id) return;
+
+  // 1. Validasi Client-Side (Tipe & Ukuran File sebelum tembak backend)
+  const validationError = validateAttachmentFile(file);
+  if (validationError) {
+    showToast(validationError);
+    input.value = ""; // Reset input
+    return;
+  }
+
   attachFileLoading.value = true;
   try {
     const att = await apiUploadFile(selectedTask.value.id, file, boardId);
@@ -3007,10 +3143,21 @@ async function handleUploadFile(event: Event) {
     selectedTask.value.attachments.push({
       id: att.id ?? null,
       title: att.file_name ?? file.name,
-      type: att.type ?? "image",
+      type: att.type ?? "file",
       url: att.file_url ?? null,
     });
-    await refreshActivityAfterAction();
+
+    // Sinkronkan count di modal dan kartu board view
+    if (selectedTask.value) {
+      selectedTask.value.attachment_count =
+        selectedTask.value.attachments?.length ?? 0;
+    }
+    const storeTask = findTaskById(selectedTask.value.id);
+    if (storeTask) {
+      storeTask.attachment_count = selectedTask.value.attachments.length;
+    }
+
+    refreshActivityAfterAction();
     showToast(`File "${file.name}" uploaded!`);
   } catch (e: any) {
     showToast(apiErrorMessage(e, "Gagal upload file."));
@@ -3037,6 +3184,10 @@ async function handleAddLink() {
       type: att?.type ?? "link",
       url: att?.file_url ?? url,
     });
+    if (selectedTask.value) {
+      selectedTask.value.attachment_count =
+        selectedTask.value.attachments?.length ?? 0;
+    }
     await refreshActivityAfterAction();
     showToast(`Link "${title}" added!`);
     attachLinkTitle.value = "";
@@ -3051,10 +3202,29 @@ async function handleAddLink() {
 
 async function handleDeleteAttachment(attachId: string | null, index: number) {
   if (!attachId) return;
+
+  // 1. Alert peringatan konfirmasi sebelum hapus
+  const confirmed = window.confirm(
+    "Apakah anda yakin menghapus attachment ini?",
+  );
+  if (!confirmed) return;
+
   try {
-    // const att = selectedTask.value?.attachments?.[index];
     await apiDeleteAttachment(attachId, boardId);
     selectedTask.value?.attachments?.splice(index, 1);
+
+    // Sinkronkan count di modal dan kartu board view
+    if (selectedTask.value) {
+      selectedTask.value.attachment_count =
+        selectedTask.value.attachments?.length ?? 0;
+    }
+    if (selectedTask.value?.id) {
+      const storeTask = findTaskById(selectedTask.value.id);
+      if (storeTask && selectedTask.value.attachments) {
+        storeTask.attachment_count = selectedTask.value.attachments.length;
+      }
+    }
+
     await refreshActivityAfterAction();
     showToast("Attachment deleted.");
   } catch (e: any) {
